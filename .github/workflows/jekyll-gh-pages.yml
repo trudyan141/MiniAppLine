@@ -1,5 +1,4 @@
-
-name: Deploy Jekyll with GitHub Pages dependencies preinstalled
+name: Deploy Vite App to GitHub Pages
 
 on:
   push:
@@ -19,17 +18,25 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-      - name: Build with Jekyll
-        uses: actions/jekyll-build-pages@v1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          source: ./
-          destination: ./_site
+          node-version: 20  # Chọn phiên bản Node.js phù hợp
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm install  # Hoặc yarn install nếu dùng yarn
+
+      - name: Build project with Vite
+        run: npm run build:client  # Chạy "vite build --config vite.client.config.ts"
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
+        with:
+          path: client-dist  # Thư mục build output của Vite
 
   deploy:
     environment:
