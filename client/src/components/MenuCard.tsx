@@ -3,7 +3,7 @@ import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { useSession } from "@/contexts/SessionContext";
 import { MenuItem } from "@shared/schema";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 
 interface MenuCardProps {
   item: MenuItem;
@@ -29,9 +29,15 @@ export default function MenuCard({
       return item.imageUrl;
     } 
     
-    // Nếu URL bắt đầu với / (đường dẫn tương đối) thì sử dụng từ gốc
-    if (item.imageUrl && item.imageUrl.startsWith('/')) {
-      return item.imageUrl;
+    // Nếu có imageUrl nhưng không phải URL đầy đủ, tìm trong thư mục assets
+    if (item.imageUrl) {
+      try {
+        // Dynamically import image from the assets folder (Vite feature)
+        // This will be resolved during build time
+        return new URL(`../assets/images/menu/${item.imageUrl}`, import.meta.url).href;
+      } catch (error) {
+        console.log(`Failed to load image from assets: ${item.imageUrl}`, error);
+      }
     }
     
     // Sử dụng ảnh placeholder nếu không có URL hoặc URL không hợp lệ

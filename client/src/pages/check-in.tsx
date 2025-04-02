@@ -38,17 +38,25 @@ export default function CheckInPage({ liff }: { liff: any }) {
       
       // Verify LINE connection first if it's required
       if (!isLineConnected) {
+        console.log("🚀 ~ handleScan ~ isLineConnected:", isLineConnected)
         toast({
           title: "LINE connection required",
           description: "Please make sure you're logged in with your LINE account before checking in.",
           variant: "destructive",
         });
+        
+        // Set timeout để đảm bảo toast hiển thị trước khi dừng quét
+        setTimeout(() => {
+          setIsProcessing(false);
+          setScanning(false);
+        }, 1000);
+        
         return;
       }
       
       // In a real-world application, we would validate the QR code data
-      // For demo, accept any QR code that contains CAFE-CHECKIN or our demo codes
-      if (data && (data.startsWith("CAFE-CHECKIN") || data.includes("CHECKIN"))) {
+      // For demo, accept any QR code
+      if (data) {
         console.log("Valid QR code scanned:", data);
         await checkIn();
         
@@ -57,7 +65,10 @@ export default function CheckInPage({ liff }: { liff: any }) {
           description: "Your session has started. Enjoy your time at Time Cafe!",
         });
         
-        navigate("/active-session");
+        // Đảm bảo toast hiển thị trước khi chuyển trang
+        setTimeout(() => {
+          navigate("/active-session");
+        }, 1000);
       } else {
         console.log("Invalid check-in QR code:", data);
         throw new Error("Invalid QR code. Please scan a valid check-in QR code.");
@@ -69,10 +80,21 @@ export default function CheckInPage({ liff }: { liff: any }) {
         description: error instanceof Error ? error.message : "Failed to start your session",
         variant: "destructive",
       });
-    } finally {
+      
+      // Đảm bảo toast hiển thị và giữ scan active
+      setTimeout(() => {
+        setIsProcessing(false);
+        // Không dừng scanning để người dùng có thể thử lại
+      }, 1000);
+      
+      return; // Thoát sớm để không chạy phần finally
+    }
+    
+    // Chỉ chạy phần này khi thành công (không có lỗi)
+    setTimeout(() => {
       setIsProcessing(false);
       setScanning(false);
-    }
+    }, 1000);
   };
 
   return (

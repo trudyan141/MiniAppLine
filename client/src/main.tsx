@@ -5,13 +5,13 @@ import { initializeLINE } from "./lib/line";
 
 // Get base path from Vite config
 const BASE_PATH = import.meta.env.BASE_URL || "/MiniAppLine/";
-console.log("Base path:", BASE_PATH);
+// console.log("Base path:", BASE_PATH);
 
 // Initialize LINE LIFF SDK
 async function start() {
   try {
     const liffId = import.meta.env.VITE_LIFF_ID || "2007185613-jxvN85ab";
-    console.log("🚀 ~ start ~ import.meta.env.VITE_LIFF_ID;:", import.meta.env.VITE_LIFF_ID)
+    // console.log("🚀 ~ start ~ import.meta.env.VITE_LIFF_ID;:", import.meta.env.VITE_LIFF_ID)
     if (!liffId) {
       console.error("Missing VITE_LIFF_ID environment variable");
     }

@@ -11,60 +11,25 @@ export function useQRScanner() {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const qrBoxSize = 250; // Size of scanning box in pixels
 
-  // Start the scanner - simplified for demo to avoid DOM issues
-  const startScanner = useCallback(() => {
-    setScanning(true);
-    setScannedData(null);
-    setError(null);
-
-    // For the demo, we'll use setTimeout to simulate scanning after a short delay
-    // In a real implementation, this would use the camera and HTML5QRCode library
-    setTimeout(() => {
-      // Create a QR code based on the path - different for check-in vs check-out
-      const isCheckoutScan = window.location.pathname.includes('checkout');
-      const qrCodeValue = isCheckoutScan 
-        ? `CAFE-CHECKOUT-${Date.now()}`
-        : `CAFE-CHECKIN-${Date.now()}`;
-        
-      console.log('QR Code scanned successfully:', qrCodeValue);
-      setScannedData(qrCodeValue);
-      setScanning(false);
-      
-      // Vibrate if supported
-      if (navigator.vibrate) {
-        navigator.vibrate(200);
-      }
-    }, 2000); // Simulate 2-second scan time
-  }, []);
-
   // Stop the scanner
   const stopScanner = useCallback(() => {
     try {
       if (scannerRef.current && scannerRef.current.isScanning) {
         scannerRef.current.stop().catch(err => console.error("Error stopping scanner:", err));
       }
+
+      const qrElement = document.getElementById('qr-reader');
+      if (qrElement) {
+        // Hide the QR reader element
+        qrElement.style.display = 'none';
+        // Clear any child elements that might have been added by Html5Qrcode
+        qrElement.innerHTML = '';
+      }
     } catch (err) {
       console.error("Error stopping scanner:", err);
     }
     setScanning(false);
   }, []);
-
-  // Toggle the flashlight/torch
-  const toggleFlashlight = useCallback(() => {
-    setFlashlightOn(prev => !prev);
-    
-    // Actual flashlight toggle would be implemented here for a real device
-    // HTML5QrCode doesn't have a direct API for this, but in a real implementation,
-    // we would use the MediaStream track capabilities to toggle the torch
-    try {
-      if (scannerRef.current && scannerRef.current.isScanning) {
-        // This would be the implementation if available
-        console.log("Flashlight toggled:", !flashlightOn);
-      }
-    } catch (err) {
-      console.error("Error toggling flashlight:", err);
-    }
-  }, [flashlightOn]);
 
   // Function to use demo scanner when real scanner fails
   const useDemoScanner = useCallback(() => {
@@ -83,6 +48,143 @@ export function useQRScanner() {
       return () => clearTimeout(timer);
     }
   }, [scanning]);
+
+  // Start the scanner
+  const startScanner = useCallback(() => {
+    setScanning(true);
+    setScannedData(null);
+    setError(null);
+
+    try {
+      const qrElement = document.getElementById('qr-reader');
+      if (!qrElement) {
+        console.error('Error: HTML Element with id=qr-reader not found');
+        setError('Scanner element not found');
+        setScanning(false);
+        useDemoScanner();
+        return;
+      }
+
+      // Ensure qrElement has dimensions
+      if (qrElement.clientWidth === 0 || qrElement.clientHeight === 0) {
+        qrElement.style.width = '100%';
+        qrElement.style.height = '100%';
+        qrElement.style.minWidth = '320px';
+        qrElement.style.minHeight = '320px';
+      }
+
+      // First clean up any existing scanner to avoid conflicts
+      if (scannerRef.current) {
+        try {
+          if (scannerRef.current.isScanning) {
+            scannerRef.current.stop().catch(err => console.error("Error stopping existing scanner:", err));
+          }
+          scannerRef.current.clear();
+        } catch (err) {
+          console.error("Error clearing existing scanner:", err);
+        }
+        // Set to null to ensure garbage collection
+        scannerRef.current = null;
+      }
+
+      // Give time for cleanup and DOM updates
+      setTimeout(() => {
+        try {
+          // Clear any previous content
+          qrElement.innerHTML = '';
+          
+          // Create a new scanner instance
+          console.log('Creating new Html5Qrcode instance');
+          scannerRef.current = new Html5Qrcode('qr-reader');
+          
+          // Simplified config to reduce errors
+          const config = {
+            fps: 5, // Lower FPS to reduce CPU usage
+            qrbox: Math.min(qrElement.clientWidth, qrElement.clientHeight) * 0.8,
+            aspectRatio: window.innerWidth > window.innerHeight ? 1.777 : 0.555,
+            formatsToSupport: [0], // QR Code only (format 0)
+          };
+          
+          console.log('Starting scanner with config:', config);
+          scannerRef.current
+            .start(
+              { facingMode: { exact: "environment" } },
+              config,
+              (decodedText) => {
+                console.log('QR Code scanned:', decodedText);
+                setScannedData(decodedText);
+                if (navigator.vibrate) {
+                  navigator.vibrate(200);
+                }
+                // Stop scanning after successful scan
+                stopScanner();
+              },
+              (errorMessage) => {
+                // Log but don't display all scan errors to user (these are normal during scanning)
+                if (!errorMessage.includes('QR code parse error')) {
+                  console.log('QR Scan error:', errorMessage);
+                }
+              }
+            )
+            .catch((err) => {
+              console.error('Error starting scanner:', err);
+              
+              // If "exact" environment camera failed, try without "exact"
+              if (err.toString().includes('exact')) {
+                console.log('Retrying with any available camera');
+                if (scannerRef.current) {
+                  scannerRef.current
+                    .start(
+                      { facingMode: "environment" },
+                      config,
+                      (decodedText) => {
+                        console.log('QR Code scanned:', decodedText);
+                        setScannedData(decodedText);
+                        if (navigator.vibrate) {
+                          navigator.vibrate(200);
+                        }
+                        stopScanner();
+                      },
+                      (errorMessage) => {
+                        if (!errorMessage.includes('QR code parse error')) {
+                          console.log('QR Scan error:', errorMessage);
+                        }
+                      }
+                    )
+                    .catch((secondErr) => {
+                      console.error('Error starting scanner with fallback:', secondErr);
+                      setError('Failed to start camera');
+                      setScanning(false);
+                      useDemoScanner();
+                    });
+                }
+              } else {
+                setError('Failed to start camera');
+                setScanning(false);
+                useDemoScanner();
+              }
+            });
+        } catch (err) {
+          console.error('Error initializing scanner:', err);
+          setError('Failed to initialize scanner');
+          setScanning(false);
+          useDemoScanner();
+        }
+      }, 100);
+    } catch (err) {
+      console.error('Error in start scanner:', err);
+      setError('Failed to initialize scanner');
+      setScanning(false);
+      useDemoScanner();
+    }
+  }, [qrBoxSize, stopScanner, useDemoScanner]);
+
+  // Toggle the flashlight/torch
+  const toggleFlashlight = useCallback(() => {
+    setFlashlightOn(prev => !prev);
+    console.log("Flashlight toggled:", !flashlightOn);
+    // In a real implementation, you'd interact with the MediaTrack capabilities
+  }, [flashlightOn]);
 
   // Check for camera availability
   useEffect(() => {
