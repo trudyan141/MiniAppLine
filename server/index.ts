@@ -53,6 +53,14 @@ app.use((req, res, next) => {
   next();
 });
 
+// Cập nhật CORS config để hỗ trợ GitHub Pages
+app.use(cors({
+  origin: ['https://trudyan141.github.io', process.env.CLIENT_URL || 'http://localhost:3000'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+}));
+
 (async () => {
   const server = await registerRoutes(app);
 
@@ -73,16 +81,11 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  // ALWAYS serve the app on port 5000
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = 5000;
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
-    log(`serving on port ${port}`);
+  // Port config
+  const PORT = process.env.PORT || 5000;
+  
+  server.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
   });
 
   // Kiểm tra cách xử lý ngày tháng ngay khi khởi động server

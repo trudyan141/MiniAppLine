@@ -21,17 +21,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       resave: false,
       saveUninitialized: false,
       cookie: { 
-        secure: false, // Set to true in production with HTTPS
+        secure: process.env.NODE_ENV === 'production', // Sử dụng secure trong production
         httpOnly: true,
-        sameSite: 'lax',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // Cho phép cross-domain trong production
         maxAge: 24 * 60 * 60 * 1000  // 1 day
       }
     })
   );
 
+  // Xử lý CORS - lấy origin từ biến môi trường và xử lý để tương thích với Railway
+  const corsOrigins = process.env.CORS_ORIGIN 
+    ? process.env.CORS_ORIGIN.split(',').map(origin => origin.trim())
+    : ['https://trudyan141.github.io', 'http://localhost:3000'];
+    
+  console.log('CORS Origins:', corsOrigins);
+
   // Add CORS configuration to allow credentials
   app.use(cors({
-    origin: ['http://localhost:3000', 'http://localhost:9090'],
+    origin: corsOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']

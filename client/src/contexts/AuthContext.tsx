@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User } from '@shared/schema';
-import { apiRequest } from '@/lib/queryClient';
+import { apiRequest, API_BASE_URL } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { 
   loginWithLINE, 
@@ -8,6 +8,9 @@ import {
   getLINEProfile, 
   registerWithLINE 
 } from '@/lib/line';
+
+// Sử dụng API_BASE_URL từ queryClient.ts để đảm bảo đồng nhất
+console.log("🚀 ~ AuthContext using API_BASE_URL:", API_BASE_URL);
 
 interface AuthContextType {
   user: User | null;
@@ -42,9 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const fetchUser = async () => {
       try {
         setIsLoading(true);
-        const response = await fetch('/api/auth/me', {
-          credentials: 'include',
-        });
+        const response = await apiRequest('GET', '/api/auth/me');
         
         if (response.ok) {
           const userData = await response.json();
