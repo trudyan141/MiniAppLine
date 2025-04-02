@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { isLINELoggedIn } from "@/lib/line";
 import { AlertCircle, Check } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function CheckInPage({ liff }: { liff: any }) {
   const [, navigate] = useLocation();
@@ -37,42 +38,74 @@ export default function CheckInPage({ liff }: { liff: any }) {
       setIsProcessing(true);
       
       // Verify LINE connection first if it's required
-      if (!isLineConnected) {
-        console.log("🚀 ~ handleScan ~ isLineConnected:", isLineConnected)
-        toast({
-          title: "LINE connection required",
-          description: "Please make sure you're logged in with your LINE account before checking in.",
-          variant: "destructive",
-        });
+      // if (!isLineConnected) {
+      //   console.log("LINE connection required:", isLineConnected);
+      //   toast({
+      //     title: "LINE connection required",
+      //     description: "Please make sure you're logged in with your LINE account before checking in.",
+      //     variant: "destructive",
+      //   });
         
-        // Set timeout để đảm bảo toast hiển thị trước khi dừng quét
-        setTimeout(() => {
-          setIsProcessing(false);
-          setScanning(false);
-        }, 1000);
+      //   // Set timeout để đảm bảo toast hiển thị trước khi dừng quét
+      //   setTimeout(() => {
+      //     setIsProcessing(false);
+      //     setScanning(false);
+      //   }, 1000);
         
-        return;
-      }
+      //   return;
+      // }
       
-      // In a real-world application, we would validate the QR code data
-      // For demo, accept any QR code
-      if (data) {
-        console.log("Valid QR code scanned:", data);
-        await checkIn();
-        
-        toast({
-          title: "Checked in successfully",
-          description: "Your session has started. Enjoy your time at Time Cafe!",
-        });
-        
-        // Đảm bảo toast hiển thị trước khi chuyển trang
-        setTimeout(() => {
-          navigate("/active-session");
-        }, 1000);
-      } else {
-        console.log("Invalid check-in QR code:", data);
+      // Validate QR code - Đảm bảo mã QR có dữ liệu
+      if (!data) {
         throw new Error("Invalid QR code. Please scan a valid check-in QR code.");
       }
+      
+      console.log("QR code scanned:", data);
+      
+      // Phân tích mã QR để lấy thông tin bàn (tableId)
+      // Format mẫu: "CAFE-TABLE-{tableId}" hoặc có thể có định dạng JSON
+      let tableId = 1; // Mặc định là bàn 1
+      
+      try {
+        if (data.startsWith("CAFE-TABLE-")) {
+          const parts = data.split("-");
+          if (parts.length >= 3) {
+            tableId = parseInt(parts[2]);
+          }
+        } else if (data.includes("tableId")) {
+          // Thử parse dữ liệu dưới dạng JSON
+          const jsonData = JSON.parse(data);
+          if (jsonData.tableId) {
+            tableId = parseInt(jsonData.tableId);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to parse QR data:", e);
+        // Tiếp tục với tableId mặc định
+      }
+      
+      // Gọi API để check-in với tableId xác định
+      const response = await apiRequest('POST', '/api/sessions/check-in', {
+        tableId: tableId
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to check in");
+      }
+      
+      // Nếu check-in thành công, gọi hàm checkIn từ SessionContext để cập nhật trạng thái
+      await checkIn();
+      
+      toast({
+        title: "Checked in successfully",
+        description: "Your session has started. Enjoy your time at Time Cafe!",
+      });
+      
+      // Đảm bảo toast hiển thị trước khi chuyển trang
+      setTimeout(() => {
+        navigate("/active-session");
+      }, 1000);
     } catch (error) {
       console.error("Failed to check in:", error);
       toast({

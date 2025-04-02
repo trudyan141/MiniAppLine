@@ -362,47 +362,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Customer routes
   app.post("/api/stripe/create-customer", async (req, res) => {
     try {
-      console.log("[Stripe API] Session:", req.session);
-      console.log("[Stripe API] UserId:", req.session.userId);
-      console.log("[Stripe API] Headers:", req.headers);
-      
       const userId = req.session.userId;
       if (!userId) {
-        // DEV MODE: Auto-login with first user
-        if (process.env.NODE_ENV !== 'production') {
-          console.log("[DEV MODE] Auto-login with first user");
-          
-          try {
-            const sqlite = (db as any).$client;
-            
-            // Get first user
-            const getUserStmt = sqlite.prepare('SELECT * FROM users LIMIT 1');
-            const firstUser = getUserStmt.get();
-            
-            if (firstUser) {
-              req.session.userId = firstUser.id;
-              await new Promise<void>((resolve) => {
-                req.session.save(() => resolve());
-              });
-              
-              const userData = {
-                id: firstUser.id,
-                username: firstUser.username,
-                fullName: firstUser.full_name,
-                email: firstUser.email
-              };
-              
-              return res.json({ 
-                message: "Auto-login successful", 
-                userId: firstUser.id,
-                user: userData
-              });
-            }
-          } catch (error) {
-            console.error('[DEV MODE] Error auto-login:', error);
-          }
-        }
-        
         return res.status(401).json({ message: "Not authenticated" });
       }
       
@@ -425,19 +386,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Check if Stripe is initialized
         if (!stripe) {
-          // Mock API for development when Stripe API key is not set
-          console.log("[MOCK API] Creating fake Stripe customer for user:", userId);
-          const mockCustomerId = `mock_customer_${userId}_${Date.now()}`;
-          
-          // Update user with mock Stripe customer ID
-          const updateStmt = sqlite.prepare(`
-            UPDATE users SET stripe_customer_id = ? WHERE id = ?
-          `);
-          updateStmt.run(mockCustomerId, userId);
-          
-          return res.json({ 
-            customerId: mockCustomerId,
-            note: "This is a mock customer ID. Set STRIPE_SECRET_KEY to use real Stripe integration."
+          return res.status(500).json({ 
+            message: "Stripe is not configured. Please set STRIPE_SECRET_KEY environment variable." 
           });
         }
         
@@ -482,12 +432,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Check if Stripe is initialized
       if (!stripe) {
-        // Mock API for development when Stripe API key is not set
-        console.log("[MOCK API] Creating fake setup intent for customer:", user.stripeCustomerId);
-        
-        return res.json({ 
-          clientSecret: `mock_seti_secret_${userId}_${Date.now()}`,
-          note: "This is a mock client secret. Set STRIPE_SECRET_KEY to use real Stripe integration."
+        return res.status(500).json({ 
+          message: "Stripe is not configured. Please set STRIPE_SECRET_KEY environment variable."
         });
       }
       

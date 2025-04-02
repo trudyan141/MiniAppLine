@@ -74,10 +74,10 @@ export const sessionsTable = sqliteTable("sessions", {
   status: sqliteText("status").notNull().default("active"), // active, completed, canceled
 });
 
-export const insertSessionSchema = createInsertSchema(sessions).pick({
-  userId: true,
-  checkInTime: true,
-  tableNumber: true,
+export const insertSessionSchema = z.object({
+  userId: z.number(),
+  checkInTime: z.string(),
+  tableNumber: z.string().optional(),
 });
 
 export const menuItems = pgTable("menu_items", {

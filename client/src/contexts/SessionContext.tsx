@@ -45,45 +45,32 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   // Fetch orders for active session
   const { 
-    data: orders,
+    data: ordersData,
     refetch: refetchOrders
   } = useQuery({
     queryKey: ['/api/orders/session'],
     enabled: true, // Always enabled to handle session changes
     refetchInterval: 3000, // Refetch every 3 seconds while active
   });
+  
+  // Ép kiểu dữ liệu orders để đảm bảo type safety
+  const orders = ordersData as Order[] | null;
 
   // Calculate total order amount
-  const totalOrderAmount = orders?.reduce((total, order) => total + order.totalCost, 0) || 0;
+  const totalOrderAmount = orders?.reduce((total: number, order: Order) => total + order.totalCost, 0) || 0;
 
   // Check in function
   const checkIn = async () => {
     try {
-      // Dev mode: Tạo phiên giả lập
-      if (process.env.NODE_ENV === 'development' && !activeSession) {
-        console.log("Development mode: Creating mock session");
-        const mockSession = {
-          id: 1,
-          userId: 1,
-          tableId: 1,
-          checkInTime: new Date().toISOString(),
-          status: "active"
-        };
-        
-        setActiveSession(mockSession as Session);
-        
-        toast({
-          title: "Checked in (Dev Mode)",
-          description: "Created mock session for development",
-        });
-        
-        return mockSession;
-      }
-      
-      // Production code
-      const res = await apiRequest('POST', '/api/sessions', {
-        tableId: 1, // You can make this dynamic later
+      // Gọi API thật để tạo phiên
+      const res = await apiRequest('POST', '/api/sessions/check-in', {
+        tableId: 1, // Có thể làm động sau này
       });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Failed to check in");
+      }
 
       const session = await res.json();
       setActiveSession(session);
@@ -96,12 +83,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   // Add to cart function
   const addToCart = (item: MenuItem, quantity: number) => {
-    // In dev mode, always allow adding to cart
-    if (process.env.NODE_ENV === 'development' && !activeSession) {
-      console.log("Development mode: Auto-creating session for cart");
-      checkIn().then(() => {
-        console.log("Mock session created for adding to cart");
+    // Phải có phiên active mới cho phép thêm vào giỏ hàng
+    if (!activeSession) {
+      toast({
+        title: "No active session",
+        description: "You need to check in first before adding items to cart",
+        variant: "destructive",
       });
+      return;
     }
     
     setCart(prevCart => {
