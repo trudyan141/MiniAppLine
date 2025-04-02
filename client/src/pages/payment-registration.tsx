@@ -181,7 +181,8 @@ export default function PaymentRegistrationPage() {
     const initializeStripe = async () => {
       try {
         // Use loadStripe directly
-        const stripeKey = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
+        const stripeKey = import.meta.env.VITE_STRIPE_PUBLIC_KEY || 'pk_test_51PTK07Cu9AgLpE3WCw7Pum7R72lu0ozUCNu9Y2VdboMMtwyibXF87PaMil1l2pMkxYyL1UebeXcczVrM4ZwFIAsf00JLbpjpI9';
+        console.log("🚀 ~ initializeStripe ~ stripeKey:", stripeKey)
         if (!stripeKey) {
           console.error("Missing Stripe public key");
           return;
@@ -196,6 +197,7 @@ export default function PaymentRegistrationPage() {
     
     initializeStripe();
   }, [user, navigate]);
+      
 
   return (
     <div className="min-h-screen bg-white p-5">

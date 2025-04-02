@@ -4,7 +4,8 @@ let stripePromise: Promise<Stripe | null>;
 
 export const getStripe = () => {
   if (!stripePromise) {
-    const stripePublicKey = import.meta.env.VITE_STRIPE_PUBLIC_KEY || '';
+    const stripePublicKey = import.meta.env.VITE_STRIPE_PUBLIC_KEY || 'pk_test_51PTK07Cu9AgLpE3WCw7Pum7R72lu0ozUCNu9Y2VdboMMtwyibXF87PaMil1l2pMkxYyL1UebeXcczVrM4ZwFIAsf00JLbpjpI9';
+    console.log("🚀 ~ getStripe ~ stripePublicKey:", stripePublicKey)
     if (!stripePublicKey) {
       console.error('Missing Stripe public key');
       return Promise.resolve(null);

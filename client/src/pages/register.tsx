@@ -27,6 +27,26 @@ const registerFormSchema = insertUserSchema.extend({
 
 type RegisterForm = z.infer<typeof registerFormSchema>;
 
+// Function to generate random user data
+const generateRandomUser = () => {
+  const randomId = Math.floor(Math.random() * 10000);
+  const today = new Date();
+  const birthYear = today.getFullYear() - 20 - Math.floor(Math.random() * 20);
+  const birthMonth = String(Math.floor(Math.random() * 12) + 1).padStart(2, '0');
+  const birthDay = String(Math.floor(Math.random() * 28) + 1).padStart(2, '0');
+  
+  return {
+    username: `user${randomId}`,
+    password: `Abc@123456`,
+    confirmPassword: `Abc@123456`,
+    fullName: `Test User ${randomId}`,
+    email: `testuser${randomId}@example.com`,
+    phoneNumber: `+1${Math.floor(Math.random() * 9000000000) + 1000000000}`,
+    dateOfBirth: `${birthYear}-${birthMonth}-${birthDay}`,
+    agreeToTerms: true
+  };
+};
+
 export default function RegisterPage({ liff }: { liff: any }) {
   const [, navigate] = useLocation();
   const { register: registerUser, registerWithLINE } = useAuth();
@@ -34,18 +54,12 @@ export default function RegisterPage({ liff }: { liff: any }) {
   const [isLineConnected, setIsLineConnected] = useState(false);
   const [lineProfile, setLineProfile] = useState<any>(null);
 
+  // Generate random user data
+  const randomUser = generateRandomUser();
+
   const form = useForm<RegisterForm>({
     resolver: zodResolver(registerFormSchema),
-    defaultValues: {
-      username: "",
-      password: "",
-      confirmPassword: "",
-      fullName: "",
-      email: "",
-      phoneNumber: "",
-      dateOfBirth: "",
-      agreeToTerms: false
-    }
+    defaultValues: randomUser
   });
 
   const onSubmit = async (data: RegisterForm) => {
@@ -95,6 +109,14 @@ export default function RegisterPage({ liff }: { liff: any }) {
     checkLineConnection();
   }, [liff, form]);
 
+  // Function to fill form with new random data
+  const fillRandomData = () => {
+    const newRandomUser = generateRandomUser();
+    Object.entries(newRandomUser).forEach(([key, value]) => {
+      form.setValue(key as keyof RegisterForm, value);
+    });
+  };
+
   return (
     <div className="min-h-screen bg-white p-5">
       <div className="flex items-center mb-6">
@@ -113,6 +135,13 @@ export default function RegisterPage({ liff }: { liff: any }) {
           </svg>
         </button>
         <h1 className="text-xl font-bold mx-auto">Create Account</h1>
+        <button 
+          className="text-sm text-[#06C755] font-medium"
+          onClick={fillRandomData}
+          type="button"
+        >
+          Randomize
+        </button>
       </div>
       
       {isLineConnected && lineProfile && (
@@ -129,6 +158,7 @@ export default function RegisterPage({ liff }: { liff: any }) {
         <CardContent className="p-0">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5 mb-8">
+              {/* Form fields remain the same */}
               <FormField
                 control={form.control}
                 name="fullName"
@@ -147,6 +177,7 @@ export default function RegisterPage({ liff }: { liff: any }) {
                 )}
               />
               
+              {/* Rest of the form fields remain unchanged */}
               <FormField
                 control={form.control}
                 name="email"
