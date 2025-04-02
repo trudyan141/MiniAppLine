@@ -1,85 +1,97 @@
-import express, { type Express } from "express";
-import fs from "fs";
 import path from "path";
-import { createServer as createViteServer, createLogger } from "vite";
-import { type Server } from "http";
-import viteConfig from "../vite.config";
-import { nanoid } from "nanoid";
+import fs from "fs";
+import { createServer } from "http";
+import { createLogger } from "vite";
+import express from "express";
+import type { Express } from "express";
+import type { Server } from "http";
+import { fileURLToPath } from 'url';
+import cors from "cors";
+import { execSync } from "child_process";
+import { join } from "path";
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const viteLogger = createLogger();
 
-export function log(message: string, source = "express") {
-  const formattedTime = new Date().toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: true,
-  });
+// Dùng màu trong bảng điều khiển
+const colors = {
+  red: (str: string) => `\u001b[31m${str}\u001b[39m`,
+  blue: (str: string) => `\u001b[34m${str}\u001b[39m`,
+  green: (str: string) => `\u001b[32m${str}\u001b[39m`,
+  yellow: (str: string) => `\u001b[33m${str}\u001b[39m`,
+  gray: (str: string) => `\u001b[90m${str}\u001b[39m`,
+}
 
-  console.log(`${formattedTime} [${source}] ${message}`);
+export function log(msg: string, color = colors.blue) {
+  console.log(color(`[TimeCafe] ${msg}`));
 }
 
 export async function setupVite(app: Express, server: Server) {
-  const serverOptions = {
-    middlewareMode: true,
-    hmr: { server },
-    allowedHosts: true,
-  };
+  // Thêm middleware CORS cho development
+  app.use(cors({
+    origin: ['http://localhost:3000', 'http://localhost:9090'],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+  }));
+  
+  try {
+    const vite = await import("vite");
+    const viteDevMiddleware = await vite.createServer({
+      appType: 'custom',
+      server: {
+        middlewareMode: true,
+        hmr: {
+          server
+        }
+      }
+    });
+    
+    app.use(viteDevMiddleware.middlewares);
+    log('Vite development server started successfully', colors.green);
+  } catch (error) {
+    log(`Failed to start Vite server: ${error}`, colors.red);
+  }
 
-  const vite = await createViteServer({
-    ...viteConfig,
-    configFile: false,
-    customLogger: {
-      ...viteLogger,
-      error: (msg, options) => {
-        viteLogger.error(msg, options);
-        process.exit(1);
-      },
-    },
-    server: serverOptions,
-    appType: "custom",
-  });
-
-  app.use(vite.middlewares);
-  app.use("*", async (req, res, next) => {
-    const url = req.originalUrl;
-
-    try {
-      const clientTemplate = path.resolve(
-        import.meta.dirname,
-        "..",
-        "client",
-        "index.html",
-      );
-
-      // always reload the index.html file from disk incase it changes
-      let template = await fs.promises.readFile(clientTemplate, "utf-8");
-      template = template.replace(
-        `src="/src/main.tsx"`,
-        `src="/src/main.tsx?v=${nanoid()}"`,
-      );
-      const page = await vite.transformIndexHtml(url, template);
-      res.status(200).set({ "Content-Type": "text/html" }).end(page);
-    } catch (e) {
-      vite.ssrFixStacktrace(e as Error);
-      next(e);
+  log('Starting development server with Vite middleware...', colors.green);
+  server.on("error", (err: NodeJS.ErrnoException) => {
+    if (err.code === "EADDRINUSE") {
+      log(`Port already in use. Please kill the process and restart the server.`, colors.red);
+      process.exit(1);
+    } else {
+      throw err;
     }
   });
 }
 
 export function serveStatic(app: Express) {
-  const distPath = path.resolve(import.meta.dirname, "public");
-
-  if (!fs.existsSync(distPath)) {
-    throw new Error(
-      `Could not find the build directory: ${distPath}, make sure to build the client first`,
-    );
+  const clientDistPath = join(process.cwd(), 'client-dist');
+  // Kiểm tra xem thư mục client-dist có tồn tại không
+  if (!fs.existsSync(clientDistPath)) {
+    try {
+      log('Client build not found. Building client...', colors.yellow);
+      execSync('npm run build:client', { stdio: 'inherit' });
+    } catch (error) {
+      log('Failed to build client. Please run `npm run build:client` manually.', colors.red);
+      process.exit(1);
+    }
   }
 
-  app.use(express.static(distPath));
-
-  // fall through to index.html if the file doesn't exist
-  app.use("*", (_req, res) => {
-    res.sendFile(path.resolve(distPath, "index.html"));
+  // Thêm middleware CORS cho production
+  app.use(cors({
+    origin: process.env.CORS_ORIGIN || true,
+    credentials: true
+  }));
+  
+  // Phục vụ các tệp tĩnh từ thư mục client-dist
+  app.use(express.static(clientDistPath));
+  
+  // Send index.html for all other routes (for SPA routing)
+  app.get('*', (req, res) => {
+    if (!req.path.startsWith('/api')) {
+      res.sendFile(join(clientDistPath, 'index.html'));
+    }
   });
+  
+  log('Static file serving configured for production', colors.green);
 }

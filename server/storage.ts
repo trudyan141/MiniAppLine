@@ -10,6 +10,52 @@ import {
 import { db } from "./db";
 import { eq, and, gt } from "drizzle-orm";
 
+const isDevelopmentWithoutDB = process.env.NODE_ENV === 'development' && !process.env.DATABASE_URL;
+
+// Bọc tất cả các hàm truy vấn database với chế độ development mà không cần database
+// Thêm đoạn này trước export const storage
+const wrapWithDevelopmentFallback = (fn) => {
+  return async (...args) => {
+    if (isDevelopmentWithoutDB) {
+      console.log(`⚠️ Mock database call: ${fn.name} with args:`, args);
+      // Trả về dữ liệu giả mẫu tùy thuộc vào tên hàm
+      if (fn.name.startsWith('get')) {
+        // Trả về đối tượng rỗng hoặc null cho các hàm getter
+        return null;
+      } else if (fn.name.startsWith('create')) {
+        // Trả về đối tượng giả với id cho các hàm tạo
+        return { id: 1, ...args[0] };
+      } else if (fn.name.startsWith('update')) {
+        // Trả về số lượng bản ghi đã cập nhật
+        return 1;
+      } else if (fn.name.startsWith('delete')) {
+        // Trả về số lượng bản ghi đã xóa
+        return 1;
+      } else {
+        // Trả về mảng rỗng cho các loại hàm khác
+        return [];
+      }
+    }
+    return fn(...args);
+  };
+};
+
+// Áp dụng wrapper cho tất cả các hàm trong storage
+const wrapStorageMethods = (storageObj) => {
+  if (isDevelopmentWithoutDB) {
+    const wrappedStorage = {};
+    for (const key in storageObj) {
+      if (typeof storageObj[key] === 'function') {
+        wrappedStorage[key] = wrapWithDevelopmentFallback(storageObj[key]);
+      } else {
+        wrappedStorage[key] = storageObj[key];
+      }
+    }
+    return wrappedStorage;
+  }
+  return storageObj;
+};
+
 export interface IStorage {
   // User operations
   getUser(id: number): Promise<User | undefined>;
@@ -570,7 +616,7 @@ export class DatabaseStorage implements IStorage {
 async function seedMenuItems() {
   const existingItems = await db.select().from(menuItems);
   
-  if (existingItems.length === 0) {
+  if (!existingItems || !Array.isArray(existingItems) || existingItems.length === 0) {
     const initialMenuItems: InsertMenuItem[] = [
       {
         name: "Cafe Latte",
@@ -611,7 +657,9 @@ async function seedMenuItems() {
   }
 }
 
-export const storage = new DatabaseStorage();
+const originalStorage = new DatabaseStorage();
+
+export const storage = wrapStorageMethods(originalStorage);
 
 // Seed initial data
 seedMenuItems().catch(console.error);
