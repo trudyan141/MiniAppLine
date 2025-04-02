@@ -1,10 +1,10 @@
 // Debug file for server
 import { IncomingMessage, ServerResponse } from 'http';
-import { db } from './db';
+import { db, formatISODate } from './db';
 
 export function logRequest(req: IncomingMessage, res: ServerResponse) {
   const { method, url, headers } = req;
-  console.log(`[${new Date().toISOString()}] ${method} ${url}`);
+  console.log(`[${formatISODate(new Date())}] ${method} ${url}`);
   console.log('Headers:', JSON.stringify(headers, null, 2));
   
   // Log request body for POST/PUT requests
@@ -25,7 +25,7 @@ export function logRequest(req: IncomingMessage, res: ServerResponse) {
   // Log response status
   const originalEnd = res.end;
   res.end = function(chunk?: any, encoding?: BufferEncoding, callback?: () => void) {
-    console.log(`[${new Date().toISOString()}] Response: ${res.statusCode}`);
+    console.log(`[${formatISODate(new Date())}] Response: ${res.statusCode}`);
     return originalEnd.call(this, chunk, encoding, callback);
   };
 }

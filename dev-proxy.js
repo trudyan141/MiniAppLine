@@ -16,9 +16,20 @@ const app = express();
 
 // Middleware to log requests
 app.use((req, res, next) => {
-  console.log(chalk.blue(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`));
+  console.log(chalk.blue(`[${safeISOString(new Date())}] ${req.method} ${req.originalUrl}`));
   next();
 });
+
+// Hàm tạo chuỗi ISO an toàn
+function safeISOString(date) {
+  try {
+    // Tạo chuỗi ISO theo cách thủ công
+    return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}T${String(date.getUTCHours()).padStart(2, '0')}:${String(date.getUTCMinutes()).padStart(2, '0')}:${String(date.getUTCSeconds()).padStart(2, '0')}.${String(date.getUTCMilliseconds()).padStart(3, '0')}Z`;
+  } catch (error) {
+    // Fallback nếu có lỗi
+    return new Date().toLocaleString();
+  }
+}
 
 // Tự xử lý proxy cho API requests thay vì dùng http-proxy-middleware
 app.use('/api', (req, res) => {

@@ -10,6 +10,32 @@ import MemoryStore from "memorystore";
 import cors from "cors";
 import jwt from 'jsonwebtoken';
 
+// Hàm tiện ích để đảm bảo tạo chuỗi ISO an toàn
+function formatISODate(date: Date | string | number | null | undefined): string {
+  try {
+    // Nếu là Date object hợp lệ, sử dụng getUTC methods để đảm bảo format đúng 
+    if (date instanceof Date && !isNaN(date.getTime())) {
+      return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}T${String(date.getUTCHours()).padStart(2, '0')}:${String(date.getUTCMinutes()).padStart(2, '0')}:${String(date.getUTCSeconds()).padStart(2, '0')}.${String(date.getUTCMilliseconds()).padStart(3, '0')}Z`;
+    }
+    
+    // Nếu là số hoặc chuỗi, tạo Date mới và thử lại
+    if (date !== null && date !== undefined) {
+      const newDate = new Date(date);
+      if (!isNaN(newDate.getTime())) {
+        return formatISODate(newDate);
+      }
+    }
+    
+    // Fallback: trả về thời gian hiện tại
+    console.warn("Invalid date provided to formatISODate", date);
+    return formatISODate(new Date());
+  } catch (error) {
+    console.error("Error in formatISODate:", error);
+    // Fallback cuối cùng
+    return new Date().toLocaleString();
+  }
+}
+
 // Khóa bí mật cho JWT
 const JWT_SECRET = process.env.JWT_SECRET || 'miniappline-jwt-secret';
 
@@ -496,26 +522,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "User already has an active session" });
       }
       
-      // Tạo chuỗi ISO theo cách thủ công để tránh lỗi toISOString
+      // Sử dụng hàm tiện ích để tạo chuỗi ISO an toàn
       const now = new Date();
-      console.log("Current date object type:", typeof now);
-      console.log("Current date object constructor:", now.constructor.name);
       console.log("Current date object:", now);
-      console.log("Current date toString:", now.toString());
-      console.log("Current date valueOf:", now.valueOf());
       
-      // Format date manually using constructor
-      let checkInTimeStr;
-      try {
-        // Sử dụng phương thức getUTC để đảm bảo kết quả nhất quán
-        checkInTimeStr = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-${String(now.getUTCDate()).padStart(2, '0')}T${String(now.getUTCHours()).padStart(2, '0')}:${String(now.getUTCMinutes()).padStart(2, '0')}:${String(now.getUTCSeconds()).padStart(2, '0')}.${String(now.getUTCMilliseconds()).padStart(3, '0')}Z`;
-        console.log("Manually created ISO string:", checkInTimeStr);
-      } catch (error) {
-        console.error("Error creating manual ISO string:", error);
-        // Fallback to old format as last resort
-        checkInTimeStr = new Date().toLocaleString();
-        console.log("Using locale string fallback:", checkInTimeStr);
-      }
+      const checkInTimeStr = formatISODate(now);
+      console.log("ISO string using formatISODate:", checkInTimeStr);
       
       const sessionData = insertSessionSchema.parse({
         userId,
@@ -552,28 +564,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Session is not active" });
       }
       
-      // Tạo chuỗi ISO theo cách thủ công để tránh lỗi toISOString
+      // Sử dụng hàm tiện ích để tạo chuỗi ISO an toàn
       const now = new Date();
-      console.log("Checkout - Current date object type:", typeof now);
       console.log("Checkout - Current date object:", now);
       
-      // Format date manually
-      let checkOutTimeStr;
-      try {
-        // Sử dụng phương thức getUTC để đảm bảo kết quả nhất quán
-        checkOutTimeStr = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-${String(now.getUTCDate()).padStart(2, '0')}T${String(now.getUTCHours()).padStart(2, '0')}:${String(now.getUTCMinutes()).padStart(2, '0')}:${String(now.getUTCSeconds()).padStart(2, '0')}.${String(now.getUTCMilliseconds()).padStart(3, '0')}Z`;
-        console.log("Manually created ISO string for checkout:", checkOutTimeStr);
-      } catch (error) {
-        console.error("Error creating manual ISO string for checkout:", error);
-        // Fallback to old format as last resort
-        checkOutTimeStr = new Date().toLocaleString();
-        console.log("Using locale string fallback for checkout:", checkOutTimeStr);
-      }
+      const checkOutTimeStr = formatISODate(now);
+      console.log("Checkout time ISO string:", checkOutTimeStr);
       
       // Parse checkInTime safely
       let checkInTime;
       try {
-        // Nếu checkInTime không phải là Date thì tạo một đối tượng Date mới
+        // Chuyển đổi checkInTime thành Date object
         checkInTime = new Date(session.checkInTime);
         console.log("Parsed checkInTime:", checkInTime);
         
@@ -1005,7 +1006,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const users = [
         {
           id: 1,
-          dateOfBirth: new Date().toISOString().split('T')[0] // Today
+          dateOfBirth: formatISODate(new Date()).split('T')[0] // Today
         }
       ];
       

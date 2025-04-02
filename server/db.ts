@@ -10,21 +10,41 @@ import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 
 neonConfig.webSocketConstructor = ws;
 
-// Hàm tiện ích để chuyển đổi ngày tháng thành chuỗi ISO
-export function toISOString(date: Date | string | null | undefined): string | null {
-  if (date === null || date === undefined) {
+// Hàm tiện ích để đảm bảo tạo chuỗi ISO an toàn
+export function formatISODate(date: Date | string | number | null | undefined): string | null {
+  try {
+    if (date === null || date === undefined) {
+      return null;
+    }
+    
+    // Nếu là Date object hợp lệ, sử dụng getUTC methods để đảm bảo format đúng 
+    if (date instanceof Date && !isNaN(date.getTime())) {
+      return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}T${String(date.getUTCHours()).padStart(2, '0')}:${String(date.getUTCMinutes()).padStart(2, '0')}:${String(date.getUTCSeconds()).padStart(2, '0')}.${String(date.getUTCMilliseconds()).padStart(3, '0')}Z`;
+    }
+    
+    // Nếu là chuỗi, trả về luôn
+    if (typeof date === 'string') {
+      return date;
+    }
+    
+    // Nếu là số hoặc chuỗi, tạo Date mới và thử lại
+    const newDate = new Date(date);
+    if (!isNaN(newDate.getTime())) {
+      return formatISODate(newDate);
+    }
+    
+    // Fallback cho trường hợp không thể chuyển đổi
+    console.warn("Invalid date provided to formatISODate:", date);
+    return null;
+  } catch (error) {
+    console.error("Error in formatISODate:", error);
     return null;
   }
-  
-  if (typeof date === 'string') {
-    return date;
-  }
-  
-  if (date instanceof Date) {
-    return date.toISOString();
-  }
-  
-  return new Date(date).toISOString();
+}
+
+// Hàm tiện ích cũ để tương thích với code hiện tại
+export function toISOString(date: Date | string | null | undefined): string | null {
+  return formatISODate(date);
 }
 
 // For development, allow running without a database

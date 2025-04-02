@@ -3,6 +3,17 @@ import { sqliteTable, text as sqliteText, integer as sqliteInt, real as sqliteRe
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Hàm tiện ích tạo chuỗi ISO an toàn
+function safeISOString(date: Date): string {
+  try {
+    // Không sử dụng toISOString mà dùng cách tạo thủ công
+    return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}T${String(date.getUTCHours()).padStart(2, '0')}:${String(date.getUTCMinutes()).padStart(2, '0')}:${String(date.getUTCSeconds()).padStart(2, '0')}.${String(date.getUTCMilliseconds()).padStart(3, '0')}Z`;
+  } catch (error) {
+    // Fallback nếu có lỗi
+    return new Date().toLocaleString();
+  }
+}
+
 // Keep PostgreSQL schema for compatibility
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -31,7 +42,7 @@ export const usersTable = sqliteTable("users", {
   phoneNumber: sqliteText("phone_number"),
   dateOfBirth: sqliteText("date_of_birth"),
   stripeCustomerId: sqliteText("stripe_customer_id"),
-  registeredAt: sqliteText("registered_at").notNull().$defaultFn(() => new Date().toISOString()),
+  registeredAt: sqliteText("registered_at").notNull().$defaultFn(() => safeISOString(new Date())),
   // LINE specific fields
   lineUserId: sqliteText("line_user_id").unique(),
   lineDisplayName: sqliteText("line_display_name"),

@@ -8,7 +8,7 @@ import {
   coupons, Coupon, InsertCoupon,
   usersTable, sessionsTable, menuItemsTable, ordersTable, orderItemsTable, paymentsTable, couponsTable
 } from "@shared/schema";
-import { db, toISOString } from "./db";
+import { db, formatISODate } from "./db";
 import { eq, and, gt } from "drizzle-orm";
 
 const isDevelopmentWithoutDB = process.env.NODE_ENV === 'development' && !process.env.DATABASE_URL;
@@ -357,7 +357,7 @@ export class MemStorage implements IStorage {
       id,
       stripePaymentId: null,
       status: "pending",
-      paymentTime: toISOString(new Date()),
+      paymentTime: formatISODate(new Date()),
     };
     this.payments.set(id, newPayment);
     return newPayment;
@@ -399,7 +399,7 @@ export class MemStorage implements IStorage {
       ...coupon,
       id,
       isUsed: false,
-      createdAt: toISOString(new Date()),
+      createdAt: formatISODate(new Date()),
     };
     this.coupons.set(id, newCoupon);
     return newCoupon;
