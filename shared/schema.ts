@@ -1,7 +1,9 @@
 import { pgTable, text, serial, integer, boolean, timestamp, real, primaryKey } from "drizzle-orm/pg-core";
+import { sqliteTable, text as sqliteText, integer as sqliteInt, real as sqliteReal } from "drizzle-orm/sqlite-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Keep PostgreSQL schema for compatibility
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
@@ -17,6 +19,24 @@ export const users = pgTable("users", {
   lineDisplayName: text("line_display_name"),
   linePictureUrl: text("line_picture_url"),
   lineStatusMessage: text("line_status_message"),
+});
+
+// SQLite schema
+export const usersTable = sqliteTable("users", {
+  id: sqliteInt("id").primaryKey({ autoIncrement: true }),
+  username: sqliteText("username").notNull().unique(),
+  password: sqliteText("password"), // Optional for LINE login
+  fullName: sqliteText("full_name").notNull(),
+  email: sqliteText("email").notNull().unique(),
+  phoneNumber: sqliteText("phone_number"),
+  dateOfBirth: sqliteText("date_of_birth"),
+  stripeCustomerId: sqliteText("stripe_customer_id"),
+  registeredAt: sqliteText("registered_at").notNull().$defaultFn(() => new Date().toISOString()),
+  // LINE specific fields
+  lineUserId: sqliteText("line_user_id").unique(),
+  lineDisplayName: sqliteText("line_display_name"),
+  linePictureUrl: sqliteText("line_picture_url"),
+  lineStatusMessage: sqliteText("line_status_message"),
 });
 
 export const insertUserSchema = createInsertSchema(users).pick({
@@ -43,6 +63,17 @@ export const sessions = pgTable("sessions", {
   status: text("status").notNull().default("active"), // active, completed, canceled
 });
 
+export const sessionsTable = sqliteTable("sessions", {
+  id: sqliteInt("id").primaryKey({ autoIncrement: true }),
+  userId: sqliteInt("user_id").notNull().references(() => usersTable.id),
+  tableNumber: sqliteText("table_number"),
+  checkInTime: sqliteText("check_in_time").notNull(),
+  checkOutTime: sqliteText("check_out_time"),
+  totalTime: sqliteInt("total_time_seconds"),
+  totalCost: sqliteReal("total_cost"),
+  status: sqliteText("status").notNull().default("active"), // active, completed, canceled
+});
+
 export const insertSessionSchema = createInsertSchema(sessions).pick({
   userId: true,
   checkInTime: true,
@@ -57,6 +88,16 @@ export const menuItems = pgTable("menu_items", {
   price: real("price").notNull(),
   imageUrl: text("image_url"),
   available: boolean("available").default(true),
+});
+
+export const menuItemsTable = sqliteTable("menu_items", {
+  id: sqliteInt("id").primaryKey({ autoIncrement: true }),
+  name: sqliteText("name").notNull(),
+  category: sqliteText("category").notNull(),
+  description: sqliteText("description").notNull(),
+  price: sqliteReal("price").notNull(),
+  imageUrl: sqliteText("image_url"),
+  available: sqliteInt("available", { mode: "boolean" }).default(true),
 });
 
 export const insertMenuItemSchema = createInsertSchema(menuItems).pick({
@@ -77,6 +118,15 @@ export const orders = pgTable("orders", {
   totalCost: real("total_cost").notNull(),
 });
 
+export const ordersTable = sqliteTable("orders", {
+  id: sqliteInt("id").primaryKey({ autoIncrement: true }),
+  sessionId: sqliteInt("session_id").notNull().references(() => sessionsTable.id),
+  userId: sqliteInt("user_id").notNull().references(() => usersTable.id),
+  orderTime: sqliteText("order_time").notNull(),
+  status: sqliteText("status").notNull().default("pending"), // pending, completed, canceled
+  totalCost: sqliteReal("total_cost").notNull(),
+});
+
 export const insertOrderSchema = createInsertSchema(orders).pick({
   sessionId: true,
   userId: true,
@@ -87,8 +137,18 @@ export const orderItems = pgTable("order_items", {
   id: serial("id").primaryKey(),
   orderId: integer("order_id").notNull().references(() => orders.id),
   menuItemId: integer("menu_item_id").notNull().references(() => menuItems.id),
-  quantity: integer("quantity").notNull().default(1),
+  quantity: integer("quantity").notNull(),
   price: real("price").notNull(),
+  notes: text("notes"),
+});
+
+export const orderItemsTable = sqliteTable("order_items", {
+  id: sqliteInt("id").primaryKey({ autoIncrement: true }),
+  orderId: sqliteInt("order_id").notNull().references(() => ordersTable.id),
+  menuItemId: sqliteInt("menu_item_id").notNull().references(() => menuItemsTable.id),
+  quantity: sqliteInt("quantity").notNull(),
+  price: sqliteReal("price").notNull(),
+  notes: sqliteText("notes"),
 });
 
 export const insertOrderItemSchema = createInsertSchema(orderItems).pick({
@@ -96,6 +156,7 @@ export const insertOrderItemSchema = createInsertSchema(orderItems).pick({
   menuItemId: true,
   quantity: true,
   price: true,
+  notes: true,
 });
 
 export const payments = pgTable("payments", {
@@ -109,10 +170,22 @@ export const payments = pgTable("payments", {
   paymentTime: timestamp("payment_time").defaultNow().notNull(),
 });
 
+export const paymentsTable = sqliteTable("payments", {
+  id: sqliteInt("id").primaryKey({ autoIncrement: true }),
+  userId: sqliteInt("user_id").notNull().references(() => usersTable.id),
+  sessionId: sqliteInt("session_id").notNull().references(() => sessionsTable.id),
+  amount: sqliteReal("amount").notNull(),
+  stripePaymentId: sqliteText("stripe_payment_id"),
+  status: sqliteText("status").notNull().default("pending"), // pending, completed, failed
+  paymentMethod: sqliteText("payment_method").default("card"),
+  paymentTime: sqliteText("payment_time").notNull(),
+});
+
 export const insertPaymentSchema = createInsertSchema(payments).pick({
   userId: true,
   sessionId: true,
   amount: true,
+  stripePaymentId: true,
   paymentMethod: true,
 });
 
@@ -125,6 +198,17 @@ export const coupons = pgTable("coupons", {
   expiryDate: timestamp("expiry_date").notNull(),
   isUsed: boolean("is_used").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const couponsTable = sqliteTable("coupons", {
+  id: sqliteInt("id").primaryKey({ autoIncrement: true }),
+  userId: sqliteInt("user_id").notNull().references(() => usersTable.id),
+  type: sqliteText("type").notNull(), // birthday, loyalty, etc.
+  code: sqliteText("code").notNull(),
+  value: sqliteReal("value").notNull(),
+  expiryDate: sqliteText("expiry_date").notNull(),
+  isUsed: sqliteInt("is_used", { mode: "boolean" }).notNull().default(false),
+  createdAt: sqliteText("created_at").notNull(),
 });
 
 export const insertCouponSchema = createInsertSchema(coupons).pick({

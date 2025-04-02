@@ -1,31 +1,41 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { db } from "./db";
 import { z } from "zod";
 import { insertUserSchema, insertSessionSchema, insertOrderSchema, insertOrderItemSchema, insertPaymentSchema } from "@shared/schema";
 import session from "express-session";
 import Stripe from "stripe";
-import pgSimple from "connect-pg-simple";
+import MemoryStore from "memorystore";
+import cors from "cors";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Setup sessions with PostgreSQL store
-  const PgSession = pgSimple(session);
+  // Setup sessions with MemoryStore for SQLite
+  const MemoryStoreSession = MemoryStore(session);
   app.use(
     session({
-      store: new PgSession({
-        conString: process.env.DATABASE_URL,
-        tableName: 'session', // Use the existing session table
-        createTableIfMissing: true
+      store: new MemoryStoreSession({
+        checkPeriod: 86400000 // 24 hours
       }),
       secret: process.env.SESSION_SECRET || "time-cafe-secret",
       resave: false,
       saveUninitialized: false,
       cookie: { 
-        secure: false, 
+        secure: false, // Set to true in production with HTTPS
+        httpOnly: true,
+        sameSite: 'lax',
         maxAge: 24 * 60 * 60 * 1000  // 1 day
       }
     })
   );
+
+  // Add CORS configuration to allow credentials
+  app.use(cors({
+    origin: ['http://localhost:3000', 'http://localhost:9090'],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  }));
 
   // Setup Stripe
   const stripeSecretKey = process.env.STRIPE_SECRET_KEY || "sk_test_your_test_key";
@@ -36,29 +46,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth routes
   app.post("/api/auth/register", async (req, res) => {
     try {
-      const userData = insertUserSchema.parse(req.body);
+      const { username, password, fullName, email, phoneNumber, dateOfBirth } = req.body;
       
-      // Check if user exists
-      const existingUser = await storage.getUserByUsername(userData.username);
-      if (existingUser) {
-        return res.status(400).json({ message: "Username already exists" });
+      console.log("Registration request:", req.body);
+      
+      if (!username || !password) {
+        return res.status(400).json({ message: 'Username and password are required' });
       }
 
-      const existingEmail = await storage.getUserByEmail(userData.email);
-      if (existingEmail) {
-        return res.status(400).json({ message: "Email already exists" });
+      // Check if username already exists
+      const existingUser = await storage.getUserByUsername(username);
+      if (existingUser) {
+        return res.status(400).json({ message: 'Username already exists' });
       }
+
+      // Dùng mật khẩu được hash sẵn (trong thực tế cần bcrypt)
+      const hashedPassword = `hashed_${password}`;
       
-      const user = await storage.createUser(userData);
-      
-      // Set session
-      req.session.userId = user.id;
-      
-      // Return user without password
-      const { password, ...userWithoutPassword } = user;
-      res.status(201).json(userWithoutPassword);
-    } catch (err: any) {
-      res.status(400).json({ message: err.message });
+      // Try to create user with direct SQL instead of ORM
+      try {
+        const sqlite = (db as any).$client;
+        
+        const stmt = sqlite.prepare(`
+          INSERT INTO users (
+            username, password, full_name, email, 
+            phone_number, date_of_birth, registered_at
+          ) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+        `);
+        
+        const result = stmt.run([
+          username,
+          hashedPassword,
+          fullName || username, // Use username as fullName if not provided
+          email || null,
+          phoneNumber || null,
+          dateOfBirth || null
+        ]);
+        
+        const userId = result.lastInsertRowid;
+        
+        // Query the newly created user
+        const getUserStmt = sqlite.prepare('SELECT * FROM users WHERE id = ?');
+        const user = getUserStmt.get(userId);
+        
+        if (!user) {
+          throw new Error('Failed to retrieve created user');
+        }
+        
+        // Convert to camelCase for response
+        const userData = {
+          id: user.id,
+          username: user.username,
+          fullName: user.full_name,
+          email: user.email,
+          phoneNumber: user.phone_number,
+          dateOfBirth: user.date_of_birth,
+          registeredAt: user.registered_at
+        };
+        
+        console.log("User created successfully:", userData);
+
+        // Set session after registration
+        req.session.userId = user.id;
+        
+        // Save session explicitly
+        req.session.save((err) => {
+          if (err) {
+            console.error('Error saving session:', err);
+            return res.status(500).json({ message: "Failed to save session" });
+          }
+          
+          res.status(201).json({ user: userData });
+        });
+      } catch (dbError: any) {
+        console.error('Database error during user creation:', dbError);
+        res.status(500).json({ message: `Database error: ${dbError.message}` });
+      }
+    } catch (error) {
+      console.error('Error registering user:', error);
+      res.status(500).json({ message: 'Internal server error' });
     }
   });
 
@@ -67,16 +133,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { username, password } = req.body;
       
       const user = await storage.getUserByUsername(username);
-      if (!user || user.password !== password) {
+      if (!user) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      // Hash password the same way as registration
+      const hashedPassword = `hashed_${password}`;
+      if (user.password !== hashedPassword) {
         return res.status(401).json({ message: "Invalid credentials" });
       }
       
       // Set session
       req.session.userId = user.id;
       
-      // Return user without password
-      const { password: pwd, ...userWithoutPassword } = user;
-      res.json(userWithoutPassword);
+      // Save session explicitly
+      req.session.save((err) => {
+        if (err) {
+          console.error('Error saving session:', err);
+          return res.status(500).json({ message: "Failed to save session" });
+        }
+        
+        // Return user without password
+        const { password: pwd, ...userWithoutPassword } = user;
+        res.json(userWithoutPassword);
+      });
     } catch (err: any) {
       res.status(400).json({ message: err.message });
     }
@@ -196,8 +276,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Customer routes
   app.post("/api/stripe/create-customer", async (req, res) => {
     try {
+      console.log("[Stripe API] Session:", req.session);
+      console.log("[Stripe API] UserId:", req.session.userId);
+      console.log("[Stripe API] Headers:", req.headers);
+      
       const userId = req.session.userId;
       if (!userId) {
+        // DEV MODE: Auto-login with first user
+        if (process.env.NODE_ENV !== 'production') {
+          console.log("[DEV MODE] Auto-login with first user");
+          const firstUser = await storage.getUsers(1);
+          if (firstUser && firstUser.length > 0) {
+            req.session.userId = firstUser[0].id;
+            await new Promise<void>((resolve) => {
+              req.session.save(() => resolve());
+            });
+            return res.json({ 
+              message: "Auto-login successful", 
+              userId: firstUser[0].id,
+              user: firstUser[0]
+            });
+          }
+        }
+        
         return res.status(401).json({ message: "Not authenticated" });
       }
       
@@ -222,6 +323,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json({ customerId: customer.id });
     } catch (err: any) {
+      console.error("[Stripe API] Error:", err);
       res.status(400).json({ message: err.message });
     }
   });
@@ -268,7 +370,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const sessionData = insertSessionSchema.parse({
         userId,
-        checkInTime: new Date(),
+        checkInTime: new Date().toISOString(),
       });
       
       const session = await storage.createSession(sessionData);
@@ -300,9 +402,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Session is not active" });
       }
       
-      const checkOutTime = new Date();
+      const checkOutTime = new Date().toISOString();
       const checkInTime = new Date(session.checkInTime);
-      const totalTimeSeconds = Math.floor((checkOutTime.getTime() - checkInTime.getTime()) / 1000);
+      const totalTimeSeconds = Math.floor((new Date(checkOutTime).getTime() - new Date(checkInTime).getTime()) / 1000);
       
       // Calculate total cost based on time
       // First hour: 500 yen
@@ -320,7 +422,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Add costs from orders
       const orders = await storage.getOrdersBySessionId(sessionId);
-      const ordersCost = orders.reduce((sum, order) => sum + order.totalCost, 0);
+      const ordersCost = orders.reduce((sum: number, order: { totalCost: number }) => sum + order.totalCost, 0);
       
       // Log the order information for debugging
       console.log("Orders found:", orders.length);
@@ -508,12 +610,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // For each order, get order items
       const ordersWithItems = await Promise.all(
-        orders.map(async (order) => {
+        orders.map(async (order: { id: number }) => {
           const items = await storage.getOrderItemsByOrderId(order.id);
           
           // For each item, get menu item details
           const itemsWithDetails = await Promise.all(
-            items.map(async (item) => {
+            items.map(async (item: { menuItemId: number }) => {
               const menuItem = await storage.getMenuItem(item.menuItemId);
               return {
                 ...item,

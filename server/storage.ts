@@ -5,9 +5,10 @@ import {
   orders, Order, InsertOrder,
   orderItems, OrderItem, InsertOrderItem,
   payments, Payment, InsertPayment,
-  coupons, Coupon, InsertCoupon
+  coupons, Coupon, InsertCoupon,
+  usersTable, sessionsTable, menuItemsTable, ordersTable, orderItemsTable, paymentsTable, couponsTable
 } from "@shared/schema";
-import { db } from "./db";
+import { db, toISOString } from "./db";
 import { eq, and, gt } from "drizzle-orm";
 
 const isDevelopmentWithoutDB = process.env.NODE_ENV === 'development' && !process.env.DATABASE_URL;
@@ -306,14 +307,14 @@ export class MemStorage implements IStorage {
 
   async createOrder(insertOrder: InsertOrder): Promise<Order> {
     const id = this.currentOrderId++;
-    const order: Order = { 
+    const newOrder: Order = { 
       ...insertOrder,
       id,
       orderTime: new Date(),
       status: "pending",
     };
-    this.orders.set(id, order);
-    return order;
+    this.orders.set(id, newOrder);
+    return newOrder;
   }
 
   async updateOrderStatus(id: number, status: string): Promise<Order | undefined> {
@@ -350,17 +351,17 @@ export class MemStorage implements IStorage {
     );
   }
 
-  async createPayment(insertPayment: InsertPayment): Promise<Payment> {
+  async createPayment(payment: InsertPayment): Promise<Payment> {
     const id = this.currentPaymentId++;
-    const payment: Payment = { 
-      ...insertPayment,
+    const newPayment: Payment = { 
+      ...payment,
       id,
       stripePaymentId: null,
       status: "pending",
-      paymentTime: new Date(),
+      paymentTime: toISOString(new Date()),
     };
-    this.payments.set(id, payment);
-    return payment;
+    this.payments.set(id, newPayment);
+    return newPayment;
   }
 
   async updatePaymentStatus(id: number, status: string, stripePaymentId?: string): Promise<Payment | undefined> {
@@ -393,16 +394,16 @@ export class MemStorage implements IStorage {
     );
   }
 
-  async createCoupon(insertCoupon: InsertCoupon): Promise<Coupon> {
+  async createCoupon(coupon: InsertCoupon): Promise<Coupon> {
     const id = this.currentCouponId++;
-    const coupon: Coupon = { 
-      ...insertCoupon,
+    const newCoupon: Coupon = { 
+      ...coupon,
       id,
       isUsed: false,
-      createdAt: new Date(),
+      createdAt: toISOString(new Date()),
     };
-    this.coupons.set(id, coupon);
-    return coupon;
+    this.coupons.set(id, newCoupon);
+    return newCoupon;
   }
 
   async useCoupon(id: number): Promise<Coupon | undefined> {
@@ -438,8 +439,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const [user] = await db.insert(users).values(insertUser).returning();
-    return user;
+    try {
+      // Không cần thêm registeredAt vì SQLite đã có giá trị mặc định
+      const [user] = await db.insert(users).values(insertUser).returning();
+      return user;
+    } catch (error) {
+      console.error(`Error creating user: ${error}`);
+      throw error;
+    }
   }
 
   async updateUser(id: number, data: Partial<User>): Promise<User | undefined> {
@@ -474,8 +481,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createSession(insertSession: InsertSession): Promise<Session> {
-    const [session] = await db.insert(sessions).values(insertSession).returning();
-    return session;
+    try {
+      // Không cần thêm checkInTime vì SQLite đã có giá trị mặc định
+      const [session] = await db.insert(sessions).values(insertSession).returning();
+      return session;
+    } catch (error) {
+      console.error(`Error creating session: ${error}`);
+      throw error;
+    }
   }
 
   async updateSession(id: number, data: Partial<Session>): Promise<Session | undefined> {
@@ -526,8 +539,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createOrder(insertOrder: InsertOrder): Promise<Order> {
-    const [order] = await db.insert(orders).values(insertOrder).returning();
-    return order;
+    try {
+      // Không cần thêm orderTime vì SQLite đã có giá trị mặc định
+      const [order] = await db.insert(orders).values(insertOrder).returning();
+      return order;
+    } catch (error) {
+      console.error(`Error creating order: ${error}`);
+      throw error;
+    }
   }
 
   async updateOrderStatus(id: number, status: string): Promise<Order | undefined> {
@@ -560,8 +579,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createPayment(insertPayment: InsertPayment): Promise<Payment> {
-    const [payment] = await db.insert(payments).values(insertPayment).returning();
-    return payment;
+    try {
+      // Không cần thêm paymentTime vì SQLite đã có giá trị mặc định
+      const [payment] = await db.insert(payments).values(insertPayment).returning();
+      return payment;
+    } catch (error) {
+      console.error(`Error creating payment: ${error}`);
+      throw error;
+    }
   }
 
   async updatePaymentStatus(id: number, status: string, stripePaymentId?: string): Promise<Payment | undefined> {
@@ -598,8 +623,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createCoupon(insertCoupon: InsertCoupon): Promise<Coupon> {
-    const [coupon] = await db.insert(coupons).values(insertCoupon).returning();
-    return coupon;
+    try {
+      // Không cần thêm createdAt vì SQLite đã có giá trị mặc định
+      const [coupon] = await db.insert(coupons).values(insertCoupon).returning();
+      return coupon;
+    } catch (error) {
+      console.error(`Error creating coupon: ${error}`);
+      throw error;
+    }
   }
 
   async useCoupon(id: number): Promise<Coupon | undefined> {
@@ -614,46 +645,82 @@ export class DatabaseStorage implements IStorage {
 
 // Initialize menu items
 async function seedMenuItems() {
-  const existingItems = await db.select().from(menuItems);
-  
-  if (!existingItems || !Array.isArray(existingItems) || existingItems.length === 0) {
-    const initialMenuItems: InsertMenuItem[] = [
-      {
-        name: "Cafe Latte",
-        category: "Drinks",
-        description: "Rich espresso with steamed milk",
-        price: 420,
-        imageUrl: "https://images.unsplash.com/photo-1517701604599-bb29b565090c",
-        available: true,
-      },
-      {
-        name: "Green Tea",
-        category: "Drinks",
-        description: "Traditional Japanese green tea",
-        price: 320,
-        imageUrl: "https://images.unsplash.com/photo-1544787219-7f47ccb76574",
-        available: true,
-      },
-      {
-        name: "Avocado Sandwich",
-        category: "Light Meals",
-        description: "Avocado, tomato, and cheese on toast",
-        price: 580,
-        imageUrl: "https://images.unsplash.com/photo-1565958011703-44f9829ba187",
-        available: true,
-      },
-      {
-        name: "Caesar Salad",
-        category: "Light Meals",
-        description: "Fresh romaine with parmesan and croutons",
-        price: 650,
-        imageUrl: "https://images.unsplash.com/photo-1623855244183-52fd8d3ce2f7",
-        available: true,
-      },
-    ];
+  try {
+    console.log("Attempting to seed menu items...");
+    let existingItems;
     
-    await db.insert(menuItems).values(initialMenuItems);
-    console.log("Initialized menu items");
+    try {
+      existingItems = await db.select().from(menuItemsTable);
+      console.log(`Found ${existingItems?.length || 0} existing menu items`);
+    } catch (error) {
+      console.error(`Error checking existing menu items: ${error}`);
+      existingItems = [];
+    }
+    
+    if (!existingItems || existingItems.length === 0) {
+      console.log("No existing menu items found. Seeding...");
+      try {
+        const initialMenuItems = [
+          {
+            name: "Cafe Latte",
+            category: "Drinks",
+            description: "Rich espresso with steamed milk",
+            price: 420,
+            imageUrl: "https://images.unsplash.com/photo-1517701604599-bb29b565090c",
+            available: true,
+          },
+          {
+            name: "Green Tea",
+            category: "Drinks",
+            description: "Traditional Japanese green tea",
+            price: 320,
+            imageUrl: "https://images.unsplash.com/photo-1544787219-7f47ccb76574",
+            available: true,
+          },
+          {
+            name: "Avocado Sandwich",
+            category: "Light Meals",
+            description: "Avocado, tomato, and cheese on toast",
+            price: 580,
+            imageUrl: "https://images.unsplash.com/photo-1565958011703-44f9829ba187",
+            available: true,
+          },
+          {
+            name: "Caesar Salad",
+            category: "Light Meals",
+            description: "Fresh romaine with parmesan and croutons",
+            price: 650,
+            imageUrl: "https://images.unsplash.com/photo-1623855244183-52fd8d3ce2f7",
+            available: true,
+          },
+        ];
+        
+        // Use direct SQL insertion instead of ORM
+        const sqlite = (dbClient as any).session.dialect.database as Database;
+        
+        const insertStmt = sqlite.prepare(`
+          INSERT INTO menu_items (name, category, description, price, image_url, available)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `);
+        
+        for (const item of initialMenuItems) {
+          insertStmt.run([
+            item.name,
+            item.category,
+            item.description,
+            item.price,
+            item.imageUrl,
+            item.available ? 1 : 0
+          ]);
+        }
+        
+        console.log(`✅ Seeded ${initialMenuItems.length} menu items successfully`);
+      } catch (error) {
+        console.error(`Error seeding menu items with direct SQL: ${error}`);
+      }
+    }
+  } catch (error) {
+    console.error(`Error seeding menu items: ${error}`);
   }
 }
 
