@@ -534,19 +534,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Not authenticated" });
       }
       
-      // Check if user already has an active session
+      // Kiểm tra nếu đã có session active
       const activeSession = await storage.getActiveSessionByUserId(userId);
-      console.log("🚀 ~ app.post ~ activeSession:", activeSession)
       if (activeSession) {
-        return res.status(400).json({ message: "User already has an active session" });
+        return res.status(400).json({ 
+          message: "You already have an active session",
+          session: activeSession
+        });
       }
       
-      // Sử dụng hàm tiện ích để tạo chuỗi ISO an toàn
       const now = new Date();
-      console.log("Current date object:", now);
       
-      const checkInTimeStr = formatISODate(now);
-      console.log("ISO string using formatISODate:", checkInTimeStr);
+      // In ra rõ ràng các giá trị để debug
+      console.log("Raw date object for check-in:", now);
+      console.log("ISO string directly:", now.toISOString());
+      
+      // Tạo chuỗi thời gian hợp lệ đảm bảo đúng định dạng ISO 8601
+      // ISO 8601 format: YYYY-MM-DDTHH:mm:ss.sssZ
+      const year = now.getUTCFullYear();
+      const month = String(now.getUTCMonth() + 1).padStart(2, "0");
+      const day = String(now.getUTCDate()).padStart(2, "0");
+      const hours = String(now.getUTCHours()).padStart(2, "0");
+      const minutes = String(now.getUTCMinutes()).padStart(2, "0");
+      const seconds = String(now.getUTCSeconds()).padStart(2, "0");
+      const milliseconds = String(now.getUTCMilliseconds()).padStart(3, "0");
+      
+      const manualISOString = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.${milliseconds}Z`;
+      console.log("Manual ISO string:", manualISOString);
+      
+      // Sử dụng chuỗi ISO trực tiếp từ Date object thay vì qua formatISODate
+      const checkInTimeStr = now.toISOString();
+      console.log("ISO string for checkInTime:", checkInTimeStr);
       
       const sessionData = insertSessionSchema.parse({
         userId,
@@ -554,7 +572,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       const session = await storage.createSession(sessionData);
-      res.status(201).json(session);
+      
+      // Log session data trả về
+      console.log("New session created:", session);
+      console.log("Session checkInTime value:", session.checkInTime);
+      console.log("Session checkInTime type:", typeof session.checkInTime);
+      
+      res.status(201).json({
+        ...session,
+        originalCheckInTime: checkInTimeStr // Thêm cả original value
+      });
     } catch (err: any) {
       console.error("Check-in error:", err);
       res.status(400).json({ message: err.message });

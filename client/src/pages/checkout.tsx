@@ -246,12 +246,48 @@ export default function CheckoutPage() {
   // For checkout, we use current time as we haven't checked out yet
   const checkOutTime = checkoutSessionData?.checkOutTime ? new Date(checkoutSessionData.checkOutTime) : new Date();
   
+  // Debug thông tin thời gian raw
+  console.log("[DEBUG] Raw check-in time string:", session.checkInTime);
+  console.log("[DEBUG] Raw check-in time original:", (session as any).originalCheckInTime);
+  console.log("[DEBUG] Parsed check-in date object:", checkInTime);
+  console.log("[DEBUG] Is valid date object:", !isNaN(checkInTime.getTime()));
+  console.log("[DEBUG] Local timezone offset (minutes):", new Date().getTimezoneOffset());
+  
+  // Tạo hàm lấy thời gian an toàn và chính xác hơn
+  const getFormattedTime = (timeStr: string) => {
+    try {
+      // Hiển thị thời gian thực tế từ chuỗi
+      const date = new Date(timeStr);
+      
+      // Kiểm tra nếu date không hợp lệ
+      if (isNaN(date.getTime())) {
+        console.warn("[DEBUG] Invalid date from string:", timeStr);
+        return "Invalid time";
+      }
+      
+      // Định dạng theo format địa phương
+      return date.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      });
+    } catch (error) {
+      console.error("[DEBUG] Error formatting time:", error);
+      return "Error";
+    }
+  };
+  
   // Format theo định dạng giờ địa phương
   const formattedCheckInTime = checkInTime.toLocaleTimeString('en-US', {
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
   });
+  
+  // Thêm debug về thời gian đã định dạng
+  console.log("[DEBUG] Formatted check-in time:", formattedCheckInTime);
+  console.log("[DEBUG] Fixed check-in time (8:00):", formattedCheckInTime === "08:00");
+  console.log("[DEBUG] Alternative format using getFormattedTime:", getFormattedTime(session.checkInTime));
   
   const formattedCheckOutTime = checkOutTime.toLocaleTimeString('en-US', {
     hour: '2-digit',

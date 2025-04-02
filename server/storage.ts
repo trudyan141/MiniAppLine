@@ -553,11 +553,30 @@ export class DatabaseStorage implements IStorage {
         // Đảm bảo giữ nguyên định dạng thời gian từ database
         // không thực hiện chuyển đổi để tránh vấn đề timezone
         console.log("Raw session data from DB:", row);
+        console.log("Raw check_in_time:", row.check_in_time);
+        console.log("Type of check_in_time:", typeof row.check_in_time);
+        
+        // Thêm xử lý cho check_in_time để chuẩn hóa định dạng
+        let checkInTime = row.check_in_time;
+        
+        // Nếu không phải chuỗi ISO, thử convert
+        if (typeof checkInTime === 'string' && !checkInTime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/)) {
+          try {
+            // Chuyển đổi về date object rồi lại về chuỗi ISO
+            const dateObj = new Date(checkInTime);
+            if (!isNaN(dateObj.getTime())) {
+              console.log("[Storage] Converting non-ISO date to ISO format");
+              checkInTime = dateObj.toISOString();
+            }
+          } catch (error) {
+            console.error("[Storage] Error converting check_in_time:", error);
+          }
+        }
         
         return {
           id: row.id,
           userId: row.user_id,
-          checkInTime: row.check_in_time,  // Giữ nguyên định dạng gốc
+          checkInTime: checkInTime,  // Sử dụng giá trị đã xử lý
           checkOutTime: row.check_out_time,
           status: row.status,
           totalTime: row.total_time,

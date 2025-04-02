@@ -6,11 +6,30 @@ import { z } from "zod";
 // Hàm tiện ích tạo chuỗi ISO an toàn
 function safeISOString(date: Date): string {
   try {
-    // Không sử dụng toISOString mà dùng cách tạo thủ công
-    return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}T${String(date.getUTCHours()).padStart(2, '0')}:${String(date.getUTCMinutes()).padStart(2, '0')}:${String(date.getUTCSeconds()).padStart(2, '0')}.${String(date.getUTCMilliseconds()).padStart(3, '0')}Z`;
+    // Kiểm tra xem date có phải là date object hợp lệ không
+    if (!(date instanceof Date) || isNaN(date.getTime())) {
+      console.error("Invalid date object:", date);
+      return new Date().toISOString();
+    }
+    
+    // Tạo chuỗi ISO chuẩn theo định dạng ISO 8601
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    const hours = String(date.getUTCHours()).padStart(2, '0');
+    const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+    const seconds = String(date.getUTCSeconds()).padStart(2, '0');
+    const milliseconds = String(date.getUTCMilliseconds()).padStart(3, '0');
+    
+    const isoString = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.${milliseconds}Z`;
+    console.log("Generated ISO string:", isoString, "from date:", date);
+    
+    // Kiểm tra điểm cuối cùng
+    return isoString;
   } catch (error) {
-    // Fallback nếu có lỗi
-    return new Date().toLocaleString();
+    console.error("Error creating ISO string from date:", error, "Date:", date);
+    // Fallback an toàn
+    return new Date().toISOString();
   }
 }
 
