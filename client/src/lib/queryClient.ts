@@ -5,8 +5,8 @@ export const AUTH_TOKEN_KEY = 'auth_token';
 
 // API base URL có thể được thay đổi khi cần kết nối từ GitHub Pages đến Railway
 // Địa chỉ API server trên Railway
-export const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://miniappline-production.up.railway.app';
-//export const API_BASE_URL = 'http://localhost:5000';
+//export const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://miniappline-production.up.railway.app';
+export const API_BASE_URL = 'http://localhost:5000';
 console.log("🚀 ~ import.meta.env.VITE_API_URL :", import.meta.env.VITE_API_URL )
 console.log("🚀 ~ API_BASE_URL:", API_BASE_URL)
 

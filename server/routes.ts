@@ -374,11 +374,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Sử dụng truy vấn SQLite trực tiếp để đảm bảo có stripe_customer_id
       try {
-        const sqlite = (db as any).$client;
+        // Kiểm tra xem db có tồn tại không
+        if (!db) {
+          console.error('[API] Database connection is undefined');
+          return res.status(500).json({ message: "Database connection error" });
+        }
         
-        // Get user
-        const getUserStmt = sqlite.prepare('SELECT * FROM users WHERE id = ?');
-        const user = getUserStmt.get(userId);
+        let user;
+        
+        try {
+          // Cố gắng sử dụng SQLite client nếu có
+          if ((db as any).$client) {
+            const sqlite = (db as any).$client;
+            const getUserStmt = sqlite.prepare('SELECT * FROM users WHERE id = ?');
+            user = getUserStmt.get(userId);
+          } else {
+            // Phương pháp thay thế khi không có $client - sử dụng storage
+            console.log('[API] $client not available, using storage instead');
+            user = await storage.getUserById(userId);
+          }
+        } catch (sqliteError) {
+          console.error('[API] Error accessing SQLite client:', sqliteError);
+          // Fallback sang phương pháp thay thế
+          user = await storage.getUserById(userId);
+        }
         
         if (!user) {
           return res.status(404).json({ message: "User not found" });
@@ -388,13 +407,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const userData = {
           id: user.id,
           username: user.username,
-          fullName: user.full_name,
+          fullName: user.full_name || user.fullName,
           email: user.email,
-          phoneNumber: user.phone_number,
-          dateOfBirth: user.date_of_birth,
-          registeredAt: user.registered_at,
+          phoneNumber: user.phone_number || user.phoneNumber,
+          dateOfBirth: user.date_of_birth || user.dateOfBirth,
+          registeredAt: user.registered_at || user.registeredAt,
           // Ánh xạ stripe_customer_id sang stripeCustomerId
-          stripeCustomerId: user.stripe_customer_id
+          stripeCustomerId: user.stripe_customer_id || user.stripeCustomerId
         };
         
         // Trả về user data
@@ -927,6 +946,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log("Get orders API - Total order amount:", totalAmount);
       console.log("Get orders API - Orders with items:", ordersWithItems.length);
+      // @ts-ignore
       console.log("Get orders API - Orders statuses:", orders.map(o => o.status).join(", "));
       
       res.json(ordersWithItems);
@@ -976,13 +996,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalCost = timeCost + orderTotal;
       }
       
-      // Truy vấn SQLite trực tiếp để lấy thông tin user và stripe_customer_id
+      // Truy vấn user và stripe_customer_id - Sử dụng phương pháp an toàn
       try {
-        const sqlite = (db as any).$client;
+        // Kiểm tra xem db có tồn tại không
+        if (!db) {
+          console.error('[Payment API] Database connection is undefined');
+          return res.status(500).json({ message: "Database connection error" });
+        }
         
-        // Get user
-        const getUserStmt = sqlite.prepare('SELECT * FROM users WHERE id = ?');
-        const user = getUserStmt.get(userId);
+        // Nếu sử dụng SQLite, đảm bảo $client có sẵn, nếu không sử dụng phương pháp thay thế
+        let user;
+        
+        try {
+          // Cố gắng sử dụng SQLite client nếu có
+          if ((db as any).$client) {
+            const sqlite = (db as any).$client;
+            const getUserStmt = sqlite.prepare('SELECT * FROM users WHERE id = ?');
+            user = getUserStmt.get(userId);
+          } else {
+            // Phương pháp thay thế khi không có $client - sử dụng storage
+            console.log('[Payment API] $client not available, using storage instead');
+            user = await storage.getUserById(userId);
+          }
+        } catch (sqliteError) {
+          console.error('[Payment API] Error accessing SQLite client:', sqliteError);
+          // Fallback sang phương pháp thay thế
+          user = await storage.getUserById(userId);
+        }
         
         if (!user) {
           return res.status(404).json({ message: "User not found" });
@@ -1029,6 +1069,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(500).json({ message: `Database error: ${dbError.message}` });
       }
     } catch (err: any) {
+      console.error('[Payment API] General error:', err);
       res.status(400).json({ message: err.message });
     }
   });

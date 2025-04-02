@@ -59,6 +59,7 @@ const wrapStorageMethods = (storageObj) => {
 export interface IStorage {
   // User operations
   getUser(id: number): Promise<User | undefined>;
+  getUserById(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   getUserByLineId(lineUserId: string): Promise<User | undefined>;
@@ -143,6 +144,11 @@ export class MemStorage implements IStorage {
 
   // User operations
   async getUser(id: number): Promise<User | undefined> {
+    return this.users.get(id);
+  }
+  
+  // Thêm getUserById giống với getUser
+  async getUserById(id: number): Promise<User | undefined> {
     return this.users.get(id);
   }
 
@@ -421,6 +427,64 @@ export class DatabaseStorage implements IStorage {
     const [user] = await db.select().from(users).where(eq(users.id, id));
     return user || undefined;
   }
+  
+  // Viết lại để mã rõ ràng hơn - getUserById giống với getUser
+  async getUserById(id: number): Promise<User | undefined> {
+    try {
+      // Kiểm tra xem db có tồn tại không
+      if (!db) {
+        console.error(`[getUserById] Database connection is undefined`);
+        return undefined;
+      }
+      
+      // Nếu có $client thì sử dụng cách truy vấn trực tiếp
+      if ((db as any).$client) {
+        const sqlite = (db as any).$client;
+        
+        const stmt = sqlite.prepare(
+          `SELECT * FROM users 
+           WHERE id = ? 
+           LIMIT 1`
+        );
+        
+        const row = stmt.get(id);
+        
+        if (!row) {
+          return undefined;
+        }
+        
+        return {
+          id: row.id,
+          username: row.username,
+          password: row.password,
+          fullName: row.full_name,
+          email: row.email,
+          phoneNumber: row.phone_number,
+          dateOfBirth: row.date_of_birth,
+          stripeCustomerId: row.stripe_customer_id,
+          registeredAt: row.registered_at ? new Date(row.registered_at) : new Date(),
+          lineUserId: row.line_user_id,
+          lineDisplayName: row.line_display_name,
+          linePictureUrl: row.line_picture_url,
+          lineStatusMessage: row.line_status_message
+        };
+      } else {
+        // Nếu không có $client, sử dụng drizzle
+        console.log(`[getUserById] Using drizzle query instead of direct SQL`);
+        return this.getUser(id);
+      }
+    } catch (err) {
+      console.error(`Error getting user with ID ${id}:`, err);
+      // Thử lại với drizzle nếu direct SQL bị lỗi
+      try {
+        console.log(`[getUserById] Fallback to drizzle query after error`);
+        return this.getUser(id);
+      } catch (fallbackErr) {
+        console.error(`Fallback failed when getting user with ID ${id}:`, fallbackErr);
+        return undefined;
+      }
+    }
+  }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.username, username));
@@ -464,37 +528,59 @@ export class DatabaseStorage implements IStorage {
   // Session operations
   async getSession(id: number): Promise<Session | undefined> {
     try {
-      const sqlite = this.db.$client;
-      
-      const stmt = sqlite.prepare(
-        `SELECT * FROM sessions 
-         WHERE id = ? 
-         LIMIT 1`
-      );
-      
-      const row = stmt.get(id);
-      
-      if (!row) {
+      // Kiểm tra xem có db không
+      if (!db) {
+        console.error(`[getSession] Database connection is undefined`);
         return undefined;
       }
       
-      // Đảm bảo giữ nguyên định dạng thời gian từ database
-      // không thực hiện chuyển đổi để tránh vấn đề timezone
-      console.log("Raw session data from DB:", row);
-      
-      return {
-        id: row.id,
-        userId: row.user_id,
-        checkInTime: row.check_in_time,  // Giữ nguyên định dạng gốc
-        checkOutTime: row.check_out_time,
-        status: row.status,
-        totalTime: row.total_time,
-        totalCost: row.total_cost,
-        tableNumber: row.table_number,
-      };
+      // Nếu có $client thì sử dụng cách truy vấn trực tiếp
+      if ((db as any).$client) {
+        const sqlite = (db as any).$client;
+        
+        const stmt = sqlite.prepare(
+          `SELECT * FROM sessions 
+           WHERE id = ? 
+           LIMIT 1`
+        );
+        
+        const row = stmt.get(id);
+        
+        if (!row) {
+          return undefined;
+        }
+        
+        // Đảm bảo giữ nguyên định dạng thời gian từ database
+        // không thực hiện chuyển đổi để tránh vấn đề timezone
+        console.log("Raw session data from DB:", row);
+        
+        return {
+          id: row.id,
+          userId: row.user_id,
+          checkInTime: row.check_in_time,  // Giữ nguyên định dạng gốc
+          checkOutTime: row.check_out_time,
+          status: row.status,
+          totalTime: row.total_time,
+          totalCost: row.total_cost,
+          tableNumber: row.table_number,
+        };
+      } else {
+        // Nếu không có $client, sử dụng drizzle
+        console.log(`[getSession] Using drizzle query instead of direct SQL`);
+        const [session] = await db.select().from(sessions).where(eq(sessions.id, id));
+        return session || undefined;
+      }
     } catch (err) {
       console.error(`Error getting session with ID ${id}:`, err);
-      throw err;
+      // Thử lại với drizzle nếu direct SQL bị lỗi
+      try {
+        console.log(`[getSession] Fallback to drizzle query after error`);
+        const [session] = await db.select().from(sessions).where(eq(sessions.id, id));
+        return session || undefined;
+      } catch (fallbackErr) {
+        console.error(`Fallback failed when getting session with ID ${id}:`, fallbackErr);
+        return undefined;
+      }
     }
   }
 
