@@ -106,6 +106,7 @@ export async function loginWithLINEAccount(liff: any) {
 }
 
 export function isLINELoggedIn(liff: any) {
+  console.log("🚀 ~ isLINELoggedIn ~ liff.isLoggedIn():", liff.isLoggedIn())
   return liff && liff.isLoggedIn();
 }
 

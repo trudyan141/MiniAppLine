@@ -31,10 +31,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [activeSession, setActiveSession] = useState<Session | null>(null);
 
   // Fetch active session
   const { 
-    data: activeSession, 
+    data: activeSessionData, 
     isLoading: isLoadingSession 
   } = useQuery({
     queryKey: ['/api/sessions/active'],
@@ -55,26 +56,64 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   // Calculate total order amount
   const totalOrderAmount = orders?.reduce((total, order) => total + order.totalCost, 0) || 0;
 
-  // Add item to cart
+  // Check in function
+  const checkIn = async () => {
+    try {
+      // Dev mode: Tạo phiên giả lập
+      if (process.env.NODE_ENV === 'development' && !activeSession) {
+        console.log("Development mode: Creating mock session");
+        const mockSession = {
+          id: 1,
+          userId: 1,
+          tableId: 1,
+          checkInTime: new Date().toISOString(),
+          status: "active"
+        };
+        
+        setActiveSession(mockSession as Session);
+        
+        toast({
+          title: "Checked in (Dev Mode)",
+          description: "Created mock session for development",
+        });
+        
+        return mockSession;
+      }
+      
+      // Production code
+      const res = await apiRequest('POST', '/api/sessions', {
+        tableId: 1, // You can make this dynamic later
+      });
+
+      const session = await res.json();
+      setActiveSession(session);
+      return session;
+    } catch (error) {
+      console.error('Check-in failed:', error);
+      throw error;
+    }
+  };
+
+  // Add to cart function
   const addToCart = (item: MenuItem, quantity: number) => {
+    // In dev mode, always allow adding to cart
+    if (process.env.NODE_ENV === 'development' && !activeSession) {
+      console.log("Development mode: Auto-creating session for cart");
+      checkIn().then(() => {
+        console.log("Mock session created for adding to cart");
+      });
+    }
+    
     setCart(prevCart => {
-      // Check if item already exists in cart
       const existingItemIndex = prevCart.findIndex(cartItem => cartItem.menuItem.id === item.id);
       
-      if (existingItemIndex >= 0) {
-        // Update quantity of existing item
-        const newCart = [...prevCart];
-        newCart[existingItemIndex].quantity = quantity;
-        return newCart;
-      } else {
-        // Add new item to cart
-        return [...prevCart, { menuItem: item, quantity }];
+      if (existingItemIndex !== -1) {
+        const updatedCart = [...prevCart];
+        updatedCart[existingItemIndex].quantity += quantity;
+        return updatedCart;
       }
-    });
-
-    toast({
-      title: "Added to cart",
-      description: `${item.name} has been added to your order.`,
+      
+      return [...prevCart, { menuItem: item, quantity }];
     });
   };
 
@@ -87,28 +126,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const clearCart = () => {
     setCart([]);
   };
-
-  // Check in mutation
-  const checkInMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest('POST', '/api/sessions/check-in', {});
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/sessions/active'] });
-      toast({
-        title: "Checked in",
-        description: "Your session has started. Enjoy your time at Time Cafe!",
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "Check-in failed",
-        description: error instanceof Error ? error.message : "Failed to start your session",
-        variant: "destructive",
-      });
-    },
-  });
 
   // Check out mutation
   const checkOutMutation = useMutation({
@@ -192,11 +209,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       });
     },
   });
-
-  // Check in function
-  const checkIn = async () => {
-    return await checkInMutation.mutateAsync();
-  };
 
   // Check out function
   const checkOut = async () => {

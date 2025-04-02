@@ -3,7 +3,7 @@ import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { useSession } from "@/contexts/SessionContext";
 import { MenuItem } from "@shared/schema";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 
 interface MenuCardProps {
   item: MenuItem;
@@ -22,29 +22,58 @@ export default function MenuCard({
   const { toast } = useToast();
   const [quantity, setQuantity] = useState(cartQuantity || 1);
 
-  const handleAddToOrder = () => {
-    if (!activeSession) {
-      toast({
-        title: "No active session",
-        description: "You need to check in first before ordering",
-        variant: "destructive",
-      });
-      return;
+  // Xử lý hình ảnh
+  const getImageUrl = () => {
+    // Nếu URL bắt đầu với http hoặc https thì sử dụng trực tiếp
+    if (item.imageUrl && (item.imageUrl.startsWith('http://') || item.imageUrl.startsWith('https://'))) {
+      return item.imageUrl;
+    } 
+    
+    // Nếu URL bắt đầu với / (đường dẫn tương đối) thì sử dụng từ gốc
+    if (item.imageUrl && item.imageUrl.startsWith('/')) {
+      return item.imageUrl;
     }
     
-    onAddToOrder(item, quantity);
+    // Sử dụng ảnh placeholder nếu không có URL hoặc URL không hợp lệ
+    return `https://via.placeholder.com/300x300?text=${encodeURIComponent(item.name)}`;
+  };
+
+  const handleAddToOrder = () => {
+    try {
+      // Check if there's no active session first
+      if (!activeSession) {
+        console.log("🚀 ~ handleAddToOrder ~ activeSession:", activeSession)
+        toast({
+          title: "No active session",
+          description: "You need to check in first before ordering",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // If there is an active session, add to order
+      onAddToOrder(item, quantity);
+      toast({
+        title: "Added to cart",
+        description: `Added ${quantity} ${item.name} to your order`,
+      });
+    } catch (error) {
+      console.log("🚀 ~ handleAddToOrder ~ error:", error)
+    }
   };
 
   return (
     <Card className="border border-gray-200 rounded-lg p-4 flex">
       <div className="w-16 h-16 bg-gray-100 rounded-lg overflow-hidden mr-3 flex-shrink-0">
-        {item.imageUrl && (
-          <img 
-            src={`${item.imageUrl}?w=300&q=80`}
-            alt={item.name} 
-            className="w-full h-full object-cover" 
-          />
-        )}
+        <img 
+          src={getImageUrl()}
+          alt={item.name} 
+          className="w-full h-full object-cover" 
+          onError={(e) => {
+            // Fallback nếu ảnh lỗi
+            (e.target as HTMLImageElement).src = `https://via.placeholder.com/300x300?text=${encodeURIComponent(item.name)}`;
+          }}
+        />
       </div>
       
       <div className="flex-1">

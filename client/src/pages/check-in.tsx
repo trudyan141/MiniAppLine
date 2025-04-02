@@ -19,8 +19,14 @@ export default function CheckInPage({ liff }: { liff: any }) {
 
   // Check LINE connection status when component mounts
   useEffect(() => {
+      console.log("🚀 ~ useEffect ~ liff:", liff)
     if (liff) {
+    
       setIsLineConnected(isLINELoggedIn(liff));
+    } else if (process.env.NODE_ENV === 'development') {
+      // Trong môi trường development, mặc định coi như đã kết nối LINE
+      console.log("Development mode: Bypassing LINE login requirement");
+      setIsLineConnected(true);
     }
   }, [liff]);
 

@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User } from '@shared/schema';
-import { apiRequest, API_BASE_URL } from '@/lib/queryClient';
+import { apiRequest, API_BASE_URL, AUTH_TOKEN_KEY } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { 
   loginWithLINE, 
@@ -45,14 +45,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const fetchUser = async () => {
       try {
         setIsLoading(true);
+        
+        // Kiểm tra token trong localStorage
+        const token = localStorage.getItem(AUTH_TOKEN_KEY);
+        if (!token) {
+          console.log("No token found in localStorage");
+          setIsLoading(false);
+          return;
+        }
+        
+        console.log("Token found in localStorage, fetching user profile...");
         const response = await apiRequest('GET', '/api/auth/me');
         
         if (response.ok) {
           const userData = await response.json();
           setUser(userData);
+          console.log("User profile loaded from API");
         }
       } catch (error) {
         console.error('Failed to fetch user:', error);
+        // Xóa token nếu không hợp lệ
+        localStorage.removeItem(AUTH_TOKEN_KEY);
       } finally {
         setIsLoading(false);
       }
@@ -65,11 +78,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setIsLoading(true);
       const res = await apiRequest('POST', '/api/auth/login', { username, password });
-      const userData = await res.json();
-      setUser(userData);
+      const data = await res.json();
+      
+      // Lưu token vào localStorage nếu có
+      if (data.token) {
+        localStorage.setItem(AUTH_TOKEN_KEY, data.token);
+        console.log("Token saved to localStorage:", data.token.substring(0, 20) + "...");
+      } else {
+        console.warn("No token received from login API");
+      }
+      
+      // Lưu thông tin user
+      setUser(data.user || data);
+      
       toast({
         title: "Logged in successfully",
-        description: `Welcome back, ${userData.fullName}!`,
+        description: `Welcome back, ${data.user?.fullName || data.fullName}!`,
       });
     } catch (error) {
       console.error('Failed to login:', error);
@@ -95,11 +119,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setIsLoading(true);
       const res = await apiRequest('POST', '/api/auth/register', userData);
-      const newUser = await res.json();
-      setUser(newUser);
+      const data = await res.json();
+      
+      // Lưu token vào localStorage nếu có
+      if (data.token) {
+        localStorage.setItem(AUTH_TOKEN_KEY, data.token);
+        console.log("Token saved to localStorage from register");
+      }
+      
+      // Lưu thông tin user
+      setUser(data.user || data);
+      
       toast({
         title: "Registration successful",
-        description: `Welcome to Time Cafe, ${newUser.fullName}!`,
+        description: `Welcome to Time Cafe, ${data.user?.fullName || data.fullName}!`,
       });
     } catch (error) {
       console.error('Failed to register:', error);
