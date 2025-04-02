@@ -66,6 +66,11 @@ export default function CheckInPage({ liff }: { liff: any }) {
     } catch (error) {
       // Error handling
       console.error("Check-in failed:", error);
+      toast({
+        title: "Check-in failed",
+        description: error instanceof Error ? error.message : "Could not check in",
+        variant: "error",
+      });
     } finally {
       // Reset after a delay to prevent rapid consecutive scans
       setTimeout(() => {
