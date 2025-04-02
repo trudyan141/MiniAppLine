@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useSession } from "@/contexts/SessionContext";
 import { useEffect, useState } from "react";
 import React from "react";
+import { format, parseISO, differenceInMinutes } from 'date-fns';
 
 export default function SuccessPage() {
   const [, navigate] = useLocation();
@@ -57,6 +58,33 @@ export default function SuccessPage() {
 
   console.log("Last session found:", lastSession?.id);
 
+  // Log thông tin chi tiết về lastSession
+  if (lastSession) {
+    console.log("[SUCCESS] Session checkInTime:", lastSession.checkInTime);
+    console.log("[SUCCESS] Session checkOutTime:", lastSession.checkOutTime);
+    
+    // Parse thời gian theo múi giờ địa phương sử dụng date-fns
+    try {
+      const checkIn = parseISO(lastSession.checkInTime);
+      const checkOut = lastSession.checkOutTime ? parseISO(lastSession.checkOutTime) : new Date();
+      
+      console.log("[SUCCESS] Parsed checkIn time:", checkIn);
+      console.log("[SUCCESS] Parsed checkOut time:", checkOut);
+      
+      // Format thời gian sử dụng date-fns
+      const formattedCheckIn = format(checkIn, 'HH:mm');
+      const formattedCheckOut = format(checkOut, 'HH:mm');
+      
+      console.log("[SUCCESS] Formatted check-in:", formattedCheckIn);
+      console.log("[SUCCESS] Formatted check-out:", formattedCheckOut);
+      
+      // Tính thời gian sử dụng phòng
+      const durationMinutes = differenceInMinutes(checkOut, checkIn);
+      console.log("[SUCCESS] Duration in minutes:", durationMinutes);
+    } catch (error) {
+      console.error("[SUCCESS] Error parsing dates:", error);
+    }
+  }
 
   // Get orders for this session
   const { data: orders = [] } = useQuery<any[]>({

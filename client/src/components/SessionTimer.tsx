@@ -1,79 +1,72 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from 'react';
 import { useTimer } from "@/lib/useTimer";
 import { Card } from "./ui/card";
 import { Session } from "@shared/schema";
 import { useSession } from "@/contexts/SessionContext";
+import { format, parseISO, differenceInSeconds } from 'date-fns';
 
 interface SessionTimerProps {
   session: Session;
   onTimeUpdate?: (seconds: number, cost: number) => void;
+  duration: number;
 }
 
-export default function SessionTimer({ session, onTimeUpdate }: SessionTimerProps) {
+export default function SessionTimer({ session, onTimeUpdate, duration }: SessionTimerProps) {
   const { totalOrderAmount } = useSession();
-  const [initialSeconds, setInitialSeconds] = useState<number>(0);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [intervalId, setIntervalId] = useState<NodeJS.Timeout | null>(null);
   
   useEffect(() => {
     console.log("============== DEBUG SESSION TIMER ==============");
     console.log("Full session object:", session);
     
-    // Xử lý an toàn chuỗi thời gian
-    try {
-      // Ưu tiên sử dụng originalCheckInTime nếu có
-      const checkInTimeStr = (session as any).originalCheckInTime || session.checkInTime;
-      console.log("Using checkInTime:", checkInTimeStr);
-      console.log("Original checkInTime:", (session as any).originalCheckInTime);
-      console.log("Regular checkInTime:", session.checkInTime);
-      console.log("Type of checkInTime:", typeof checkInTimeStr);
-      
-      // Tạo đối tượng Date từ chuỗi thời gian
-      let startTime: Date;
-      
-      if (typeof checkInTimeStr === 'string') {
-        // Nếu là chuỗi ISO, sử dụng trực tiếp
-        startTime = new Date(checkInTimeStr);
-        console.log("Parsed date object:", startTime);
-        console.log("Date.getTime():", startTime.getTime());
-        console.log("Is valid date:", !isNaN(startTime.getTime()));
-        console.log("Local time string:", startTime.toLocaleString());
-        console.log("ISO string:", startTime.toISOString());
-        
-        // Kiểm tra xem date có hợp lệ không
-        if (isNaN(startTime.getTime())) {
-          console.error("Invalid date from checkInTime:", checkInTimeStr);
-          // Sử dụng thời gian hiện tại làm fallback
-          startTime = new Date();
+    // Tính toán tổng thời gian đã trôi qua
+    const updateElapsedTime = () => {
+      try {
+        // Kiểm tra và chuyển đổi kiểu của checkInTime
+        let checkInTimeStr: string;
+        if (typeof session.checkInTime === 'string') {
+          checkInTimeStr = session.checkInTime;
+        } else if (session.checkInTime instanceof Date) {
+          checkInTimeStr = session.checkInTime.toISOString();
+        } else {
+          // Fallback nếu kiểu dữ liệu không xác định
+          console.error("Unknown checkInTime type:", typeof session.checkInTime);
+          checkInTimeStr = new Date().toISOString();
         }
-      } else {
-        // Nếu không phải chuỗi, sử dụng thời gian hiện tại
-        console.error("checkInTime is not a string:", checkInTimeStr);
-        startTime = new Date();
+        
+        console.log("CheckInTime after conversion:", checkInTimeStr);
+        
+        // Parse thời gian check-in
+        const startTime = parseISO(checkInTimeStr);
+        const now = new Date();
+        
+        // Tính toán thời gian đã trôi qua bằng date-fns
+        const secondsElapsed = differenceInSeconds(now, startTime);
+        
+        console.log("Check-in time string:", checkInTimeStr);
+        console.log("Parsed start time:", startTime);
+        console.log("Current time:", now);
+        console.log("Elapsed seconds:", secondsElapsed);
+        
+        setElapsedSeconds(secondsElapsed > 0 ? secondsElapsed : 0);
+      } catch (error) {
+        console.error("Error calculating elapsed time:", error);
       }
-      
-      // Log thời gian hiện tại cho so sánh
-      const now = new Date();
-      console.log("Current time:", now);
-      console.log("Current timestamp:", now.getTime());
-      
-      // Tính thời gian đã trôi qua tính bằng giây
-      const seconds = Math.floor((now.getTime() - startTime.getTime()) / 1000);
-      console.log("Elapsed time in seconds:", seconds);
-      console.log("Elapsed time (hours:minutes):", 
-        `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`);
-      
-      // Đảm bảo số giây là số dương
-      const validSeconds = seconds > 0 ? seconds : 0;
-      setInitialSeconds(validSeconds);
-    } catch (error) {
-      console.error("Error parsing session time:", error);
-      // Trong trường hợp lỗi, sử dụng 0 làm giá trị mặc định
-      setInitialSeconds(0);
-    }
-    console.log("================================================");
-  }, [session.checkInTime]);
+    };
+
+    // Cập nhật ngay lập tức và sau đó mỗi giây
+    updateElapsedTime();
+    const id = setInterval(updateElapsedTime, 1000);
+    setIntervalId(id);
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [session]);
   
   const timer = useTimer({
-    initialSeconds,
+    initialSeconds: elapsedSeconds,
     autoStart: true,
   });
   
@@ -86,17 +79,42 @@ export default function SessionTimer({ session, onTimeUpdate }: SessionTimerProp
   // Format thời gian bắt đầu phiên
   let formattedStartTime = "00:00";
   try {
-    const startTime = new Date(session.checkInTime);
-    if (!isNaN(startTime.getTime())) {
-      formattedStartTime = startTime.toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-      });
+    // Kiểm tra và chuyển đổi kiểu của checkInTime
+    let checkInTimeStr: string;
+    if (typeof session.checkInTime === 'string') {
+      checkInTimeStr = session.checkInTime;
+    } else if (session.checkInTime instanceof Date) {
+      checkInTimeStr = session.checkInTime.toISOString();
+    } else {
+      // Fallback nếu kiểu dữ liệu không xác định
+      console.error("Unknown checkInTime type for formatting:", typeof session.checkInTime);
+      checkInTimeStr = new Date().toISOString();
     }
+    
+    console.log("Formatting checkInTime:", checkInTimeStr);
+    
+    // Parse và format thời gian
+    const startTime = parseISO(checkInTimeStr);
+    formattedStartTime = format(startTime, 'HH:mm');
+    
+    console.log("Raw checkInTime:", session.checkInTime);
+    console.log("Converted to string:", checkInTimeStr);
+    console.log("Parsed with date-fns:", startTime);
+    console.log("Formatted with date-fns:", formattedStartTime);
   } catch (error) {
     console.error("Error formatting start time:", error);
   }
+
+  // Định dạng thời gian trôi qua
+  const hours = Math.floor(elapsedSeconds / 3600);
+  const minutes = Math.floor((elapsedSeconds % 3600) / 60);
+  const seconds = elapsedSeconds % 60;
+
+  const formattedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+
+  // Tính giá trị phần trăm cho thanh tiến trình
+  const maxSeconds = duration * 3600; // Chuyển đổi giờ thành giây
+  const progress = Math.min((elapsedSeconds / maxSeconds) * 100, 100);
 
   return (
     <Card className="bg-white p-4 rounded-xl shadow-md">
@@ -114,24 +132,24 @@ export default function SessionTimer({ session, onTimeUpdate }: SessionTimerProp
         </div>
         <div>
           <p className="text-gray-600 text-sm">Session in Progress</p>
-          <h2 className="text-lg font-bold text-gray-900">
+          <h2 className="text-xl font-bold text-gray-900">
             {timer.hours}:{timer.minutes}:{timer.seconds}
           </h2>
         </div>
       </div>
       
-      <div className="flex justify-between text-sm">
+      <div className="grid grid-cols-3 gap-4 text-sm">
         <div>
           <p className="text-gray-600">Current Cost</p>
-          <p className="font-medium">¥{timer.calculateCost()}</p>
+          <p className="font-semibold text-lg">¥{timer.calculateCost()}</p>
         </div>
         <div>
           <p className="text-gray-600">Started At</p>
-          <p className="font-medium">{formattedStartTime}</p>
+          <p className="font-semibold text-lg">{formattedStartTime}</p>
         </div>
         <div>
           <p className="text-gray-600">Orders</p>
-          <p className="font-medium">+ ¥{totalOrderAmount}</p>
+          <p className="font-semibold text-lg">+ ¥{totalOrderAmount}</p>
         </div>
       </div>
     </Card>
