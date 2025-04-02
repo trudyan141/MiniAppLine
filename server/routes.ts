@@ -497,9 +497,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Convert Date to ISO string since the schema expects a string
+      const now = new Date();
+      console.log("Current date object:", now);
+      
+      let checkInTimeStr;
+      try {
+        checkInTimeStr = now.toISOString();
+        console.log("ISO string:", checkInTimeStr);
+      } catch (error) {
+        console.error("Error converting date to ISO string:", error);
+        // Fallback to manual ISO string format
+        checkInTimeStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}T${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}.${String(now.getMilliseconds()).padStart(3, '0')}Z`;
+        console.log("Fallback ISO string:", checkInTimeStr);
+      }
+      
       const sessionData = insertSessionSchema.parse({
         userId,
-        checkInTime: new Date().toISOString(), // Convert to ISO string
+        checkInTime: checkInTimeStr,
       });
       
       const session = await storage.createSession(sessionData);
@@ -532,9 +546,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Session is not active" });
       }
       
-      const checkOutTime = new Date().toISOString();
-      const checkInTime = new Date(session.checkInTime);
-      const totalTimeSeconds = Math.floor((new Date(checkOutTime).getTime() - new Date(checkInTime).getTime()) / 1000);
+      // Convert dates to ISO string safely
+      const now = new Date();
+      let checkOutTimeStr;
+      try {
+        checkOutTimeStr = now.toISOString();
+      } catch (error) {
+        console.error("Error converting checkout date to ISO string:", error);
+        // Fallback to manual ISO string format
+        checkOutTimeStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}T${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}.${String(now.getMilliseconds()).padStart(3, '0')}Z`;
+      }
+      
+      // Make sure checkInTime is a valid date
+      let checkInTime;
+      try {
+        checkInTime = new Date(session.checkInTime);
+        if (isNaN(checkInTime.getTime())) {
+          throw new Error("Invalid date");
+        }
+      } catch (error) {
+        console.error("Error parsing checkInTime:", error, "Value:", session.checkInTime);
+        return res.status(400).json({ message: "Invalid check-in time in session data" });
+      }
+      
+      const totalTimeSeconds = Math.floor((now.getTime() - checkInTime.getTime()) / 1000);
       
       // Calculate total cost based on time
       // First hour: 500 yen
@@ -567,7 +602,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updatedSession = await storage.updateSession(
         sessionId,
         {
-          checkOutTime,
+          checkOutTime: checkOutTimeStr,
           totalTime: totalTimeSeconds,
           totalCost,
         }
