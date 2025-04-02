@@ -8,6 +8,25 @@ import session from "express-session";
 import Stripe from "stripe";
 import MemoryStore from "memorystore";
 import cors from "cors";
+import jwt from 'jsonwebtoken';
+
+// Khóa bí mật cho JWT
+const JWT_SECRET = process.env.JWT_SECRET || 'miniappline-jwt-secret';
+
+// Hàm tạo JWT token
+const generateToken = (userId: number): string => {
+  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '1d' });
+};
+
+// Hàm xác thực JWT token
+const verifyToken = (token: string): { userId: number } | null => {
+  try {
+    return jwt.verify(token, JWT_SECRET) as { userId: number };
+  } catch (error) {
+    console.error('JWT verification error:', error);
+    return null;
+  }
+};
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup sessions with MemoryStore for SQLite
@@ -21,28 +40,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       resave: false,
       saveUninitialized: false,
       cookie: { 
-        secure: process.env.NODE_ENV === 'production', // Sử dụng secure trong production
+        secure: process.env.NODE_ENV === 'production', // Sử dụng secure trong production (HTTPS)
         httpOnly: true,
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // Cho phép cross-domain trong production
-        maxAge: 24 * 60 * 60 * 1000  // 1 day
+        sameSite: 'none', // Bắt buộc phải là 'none' cho cross-origin
+        maxAge: 24 * 60 * 60 * 1000,  // 1 day
+        path: '/'  // Đảm bảo cookie được gửi cho tất cả các route
       }
     })
   );
 
-  // Xử lý CORS - lấy origin từ biến môi trường và xử lý để tương thích với Railway
-  const corsOrigins = process.env.CORS_ORIGIN 
-    ? process.env.CORS_ORIGIN.split(',').map(origin => origin.trim())
-    : ['https://trudyan141.github.io', 'http://localhost:3000'];
-    
-  console.log('CORS Origins:', corsOrigins);
-
-  // Add CORS configuration to allow credentials
+  // Cấu hình CORS đơn giản hóa - cho phép tất cả các origin
   app.use(cors({
-    origin: corsOrigins,
+    origin: true, // Cho phép tất cả các origin
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+    allowedHeaders: ['Content-Type', 'Authorization']
   }));
+
+  // Middleware xác thực JWT
+  app.use((req, res, next) => {
+    // Kiểm tra JWT token từ header Authorization
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      const payload = verifyToken(token);
+      
+      if (payload && payload.userId) {
+        // Lưu userId vào session để tương thích với code hiện tại
+        req.session.userId = payload.userId;
+      }
+    }
+    
+    // Log thông tin request
+    console.log(`[API] ${req.method} ${req.url}`);
+    console.log(`[API] User ID: ${req.session.userId || 'Not authenticated'}`);
+    
+    next();
+  });
 
   // Setup Stripe
   const stripeSecretKey = process.env.STRIPE_SECRET_KEY || "sk_test_51PTK07Cu9AgLpE3WqAxlBYnCDwIIT7ptcbMfZzqqlhrmvMC4l9QF4v385GoaMNNSkop5v86K1fSV5XEBsxR5zBTT00lGeY13KG";
@@ -59,6 +93,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.warn("Failed to initialize Stripe:", error);
     // We'll use mock API if initialization fails
   }
+
+  // Test route for authentication
+  app.get("/api/test-auth", (req, res) => {
+    if (req.session.userId) {
+      return res.json({ 
+        message: "Authenticated", 
+        userId: req.session.userId
+      });
+    } else {
+      return res.status(401).json({ 
+        message: "Not authenticated"
+      });
+    }
+  });
 
   // Auth routes
   app.post("/api/auth/register", async (req, res) => {
@@ -126,17 +174,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         console.log("User created successfully:", userData);
 
-        // Set session after registration
+        // Tạo JWT token
+        const token = generateToken(user.id);
+        
+        // Set session sau khi đăng ký (vẫn giữ để tương thích)
         req.session.userId = user.id;
         
-        // Save session explicitly
-        req.session.save((err) => {
-          if (err) {
-            console.error('Error saving session:', err);
-            return res.status(500).json({ message: "Failed to save session" });
-          }
-          
-          res.status(201).json({ user: userData });
+        res.status(201).json({ 
+          user: userData,
+          token
         });
       } catch (dbError: any) {
         console.error('Database error during user creation:', dbError);
@@ -172,28 +218,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(401).json({ message: "Invalid credentials" });
         }
         
-        // Set session
+        // Tạo JWT token
+        const token = generateToken(user.id);
+        
+        // Set session sau khi đăng nhập (vẫn giữ để tương thích)
         req.session.userId = user.id;
         
-        // Save session explicitly
-        req.session.save((err) => {
-          if (err) {
-            console.error('Error saving session:', err);
-            return res.status(500).json({ message: "Failed to save session" });
-          }
-          
-          // Return user without password
-          const userData = {
-            id: user.id,
-            username: user.username,
-            fullName: user.full_name,
-            email: user.email,
-            phoneNumber: user.phone_number,
-            dateOfBirth: user.date_of_birth,
-            registeredAt: user.registered_at
-          };
-          
-          res.json(userData);
+        // Return user without password
+        const userData = {
+          id: user.id,
+          username: user.username,
+          fullName: user.full_name,
+          email: user.email,
+          phoneNumber: user.phone_number,
+          dateOfBirth: user.date_of_birth,
+          registeredAt: user.registered_at
+        };
+        
+        res.json({
+          user: userData,
+          token
         });
       } catch (dbError: any) {
         console.error('Database error during login:', dbError);

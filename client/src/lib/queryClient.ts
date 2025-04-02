@@ -1,9 +1,27 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
+// Key để lưu token trong localStorage
+export const AUTH_TOKEN_KEY = 'auth_token';
+
 // API base URL có thể được thay đổi khi cần kết nối từ GitHub Pages đến Railway
 // Địa chỉ API server trên Railway
 export const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://miniappline-production.up.railway.app';
 console.log("🚀 ~ API_BASE_URL:", API_BASE_URL)
+
+// Lưu token trong localStorage
+export function saveAuthToken(token: string) {
+  localStorage.setItem(AUTH_TOKEN_KEY, token);
+}
+
+// Lấy token từ localStorage
+export function getAuthToken(): string | null {
+  return localStorage.getItem(AUTH_TOKEN_KEY);
+}
+
+// Xóa token khỏi localStorage khi đăng xuất
+export function removeAuthToken() {
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+}
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -23,16 +41,30 @@ export async function apiRequest(
   // Chuẩn bị request options
   const options: RequestInit = {
     method,
-    credentials: "include"
+    headers: {},
   };
+  
+  // Thêm token vào header nếu đã đăng nhập
+  const token = getAuthToken();
+  if (token) {
+    options.headers = { 
+      ...options.headers,
+      'Authorization': `Bearer ${token}`
+    };
+  }
   
   // Chỉ thêm headers và body nếu method không phải GET hoặc HEAD và có data
   if (method !== 'GET' && method !== 'HEAD' && data !== undefined) {
-    options.headers = { "Content-Type": "application/json" };
+    options.headers = { 
+      ...options.headers,
+      "Content-Type": "application/json",
+    };
     options.body = JSON.stringify(data);
   }
   
+  console.log(`Gọi API: ${method} ${fullUrl}`);
   const res = await fetch(fullUrl, options);
+  console.log(`Kết quả API: ${res.status}`);
 
   await throwIfResNotOk(res);
   return res;
@@ -48,9 +80,19 @@ export const getQueryFn: <T>(options: {
     // Nếu path không có protocol (http:// hoặc https://), thêm API_BASE_URL
     const fullUrl = path.startsWith('http') ? path : `${API_BASE_URL}${path}`;
     
-    const res = await fetch(fullUrl, {
-      credentials: "include",
-    });
+    const options: RequestInit = {
+      headers: {}
+    };
+    
+    // Thêm token vào header nếu đã đăng nhập
+    const token = getAuthToken();
+    if (token) {
+      options.headers = { 
+        'Authorization': `Bearer ${token}`
+      };
+    }
+    
+    const res = await fetch(fullUrl, options);
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
       return null;
