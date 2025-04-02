@@ -1,3 +1,6 @@
+// Import polyfill trước mọi module khác
+import './polyfill';
+
 import 'dotenv/config';
 import express, { type Request, Response, NextFunction } from "express";
 import cors from "cors";
