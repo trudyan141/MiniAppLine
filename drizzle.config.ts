@@ -24,4 +24,4 @@ const sqliteConfig = defineConfig({
 });
 
 // Use PostgreSQL config as default since the codebase was initially designed for PostgreSQL
-export default process.env.DB_TYPE === 'sqlite' ? sqliteConfig : postgresConfig;
+export default process.env.DB_TYPE === 'sqlite' ? sqliteConfig : sqliteConfig;
