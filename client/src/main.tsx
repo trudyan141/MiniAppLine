@@ -10,7 +10,8 @@ console.log("Base path:", BASE_PATH);
 // Initialize LINE LIFF SDK
 async function start() {
   try {
-    const liffId = import.meta.env.VITE_LIFF_ID;
+    const liffId = import.meta.env.VITE_LIFF_ID || "2007185613-jxvN85ab";
+    console.log("🚀 ~ start ~ import.meta.env.VITE_LIFF_ID;:", import.meta.env.VITE_LIFF_ID)
     if (!liffId) {
       console.error("Missing VITE_LIFF_ID environment variable");
     }
