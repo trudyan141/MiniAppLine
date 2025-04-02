@@ -37,14 +37,14 @@ export default function CheckInPage({ liff }: { liff: any }) {
   // Then modify your QR scan handler function
   const handleScan = async (data: string) => {
     console.log("QR code scanned:", data);
-    // if(!isLINELoggedIn(liff)){
-    //   toast({
-    //     title: "LINE Account Required",
-    //     description: "Please return to login and connect your LINE account first.",
-    //     variant: "error",
-    //   });
-    //   return;
-    // }
+    if(!isLINELoggedIn(liff)){
+      toast({
+        title: "LINE Account Required",
+        description: "Please return to login and connect your LINE account first.",
+        variant: "error",
+      });
+      return;
+    }
     // Prevent duplicate API calls
     if (isProcessingCheckIn) {
       console.log("Already processing check-in, ignoring duplicate scan");
