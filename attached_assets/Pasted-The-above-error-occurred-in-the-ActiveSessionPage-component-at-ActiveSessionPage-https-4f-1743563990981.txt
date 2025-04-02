@@ -1,0 +1,34 @@
+The above error occurred in the <ActiveSessionPage> component:
+
+    at ActiveSessionPage (https://4f5a2a6e-1b90-4234-a42e-ffe8690acce6-00-3c6ihkob0kbcg.riker.replit.dev/src/pages/active-session.tsx:30:24)
+    at div
+    at MainLayout (https://4f5a2a6e-1b90-4234-a42e-ffe8690acce6-00-3c6ihkob0kbcg.riker.replit.dev/src/components/layouts/MainLayout.tsx:21:38)
+    at Route (https://4f5a2a6e-1b90-4234-a42e-ffe8690acce6-00-3c6ihkob0kbcg.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=2b0ee8e9:323:16)
+    at Switch (https://4f5a2a6e-1b90-4234-a42e-ffe8690acce6-00-3c6ihkob0kbcg.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=2b0ee8e9:379:17)
+    at Router (https://4f5a2a6e-1b90-4234-a42e-ffe8690acce6-00-3c6ihkob0kbcg.riker.replit.dev/src/App.tsx?v=CIKiXxxDI7CKgyJk3B8ET:41:19)
+    at SessionProvider (https://4f5a2a6e-1b90-4234-a42e-ffe8690acce6-00-3c6ihkob0kbcg.riker.replit.dev/src/contexts/SessionContext.tsx:24:35)
+    at AuthProvider (https://4f5a2a6e-1b90-4234-a42e-ffe8690acce6-00-3c6ihkob0kbcg.riker.replit.dev/src/contexts/AuthContext.tsx:22:32)
+    at QueryClientProvider (https://4f5a2a6e-1b90-4234-a42e-ffe8690acce6-00-3c6ihkob0kbcg.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=2b0ee8e9:2805:3)
+    at App (https://4f5a2a6e-1b90-4234-a42e-ffe8690acce6-00-3c6ihkob0kbcg.riker.replit.dev/src/App.tsx?v=CIKiXxxDI7CKgyJk3B8ET:207:16)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
+
+at ActiveSessionPage (https://4f5a2a6e-1b90-4234-a42e-ffe8690acce6-00-3c6ihkob0kbcg.riker.replit.dev/src/pages/active-session.tsx:30:24)
+at div
+at MainLayout (https://4f5a2a6e-1b90-4234-a42e-ffe8690acce6-00-3c6ihkob0kbcg.riker.replit.dev/src/components/layouts/MainLayout.tsx:21:38)
+at Route (https://4f5a2a6e-1b90-4234-a42e-ffe8690acce6-00-3c6ihkob0kbcg.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=2b0ee8e9:323:16)
+at Switch (https://4f5a2a6e-1b90-4234-a42e-ffe8690acce6-00-3c6ihkob0kbcg.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=2b0ee8e9:379:17)
+at Router (https://4f5a2a6e-1b90-4234-a42e-ffe8690acce6-00-3c6ihkob0kbcg.riker.replit.dev/src/App.tsx?v=CIKiXxxDI7CKgyJk3B8ET:41:19)
+at SessionProvider (https://4f5a2a6e-1b90-4234-a42e-ffe8690acce6-00-3c6ihkob0kbcg.riker.replit.dev/src/contexts/SessionContext.tsx:24:35)
+at AuthProvider (https://4f5a2a6e-1b90-4234-a42e-ffe8690acce6-00-3c6ihkob0kbcg.riker.replit.dev/src/contexts/AuthContext.tsx:22:32)
+at QueryClientProvider (https://4f5a2a6e-1b90-4234-a42e-ffe8690acce6-00-3c6ihkob0kbcg.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=2b0ee8e9:2805:3)
+at App (https://4f5a2a6e-1b90-4234-a42e-ffe8690acce6-00-3c6ihkob0kbcg.riker.replit.dev/src/App.tsx?v=CIKiXxxDI7CKgyJk3B8ET:207:16)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
+at t.value (https://4f5a2a6e-1b90-4234-a42e-ffe8690acce6-00-3c6ihkob0kbcg.riker.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:17465)
+at new t (https://4f5a2a6e-1b90-4234-a42e-ffe8690acce6-00-3c6ihkob0kbcg.riker.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:12630)
+at t.value (https://4f5a2a6e-1b90-4234-a42e-ffe8690acce6-00-3c6ihkob0kbcg.riker.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:32766)
+at https://4f5a2a6e-1b90-4234-a42e-ffe8690acce6-00-3c6ihkob0kbcg.riker.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:34400
+Link is not defined
