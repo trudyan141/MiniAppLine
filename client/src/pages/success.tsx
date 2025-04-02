@@ -1,44 +1,88 @@
 import { useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { LineButton } from "@/components/ui/line-button";
 import { useAuth } from "@/contexts/AuthContext";
-import { useState } from "react";
+import { useSession } from "@/contexts/SessionContext";
+import { useEffect, useState } from "react";
+import React from "react";
 
 export default function SuccessPage() {
   const [, navigate] = useLocation();
   const { user } = useAuth();
+  const { setActiveSession, clearCart } = useSession();
+  const queryClient = useQueryClient();
   const [rating, setRating] = useState(0);
+  const hasRunRef = React.useRef(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [debugInfo, setDebugInfo] = useState<any>({});
+
+  console.log("Rendering SuccessPage, user:", !!user);
 
   // Get the last completed session
-  const { data: sessions } = useQuery<any[]>({
+  const { data: sessions, isLoading: isLoadingSessions, error: sessionsError } = useQuery<any[]>({
     queryKey: ['/api/sessions/history'],
     enabled: !!user,
+    retry: 2,
+    staleTime: 0,
+    refetchOnMount: true,
   });
+
+
+  // Kiểm tra dữ liệu session và tìm session gần nhất đã hoàn thành
+  useEffect(() => {
+    if (sessions) {
+      const completedSessions = sessions.filter(s => s.status === "completed");
+      console.log("Completed sessions:", completedSessions.length);
+      
+      // Nếu không có session nào được đánh dấu là completed, thử lấy cái mới nhất
+      if (completedSessions.length === 0 && sessions.length > 0) {
+        const newestSession = [...sessions].sort((a, b) => 
+          new Date(b.updatedAt || b.checkOutTime || b.checkInTime).getTime() - 
+          new Date(a.updatedAt || a.checkOutTime || a.checkInTime).getTime()
+        )[0];
+        
+        console.log("No completed sessions found, using newest:", newestSession);
+        setDebugInfo((prev: Record<string, unknown>) => ({ ...prev, newestSession }));
+      }
+    }
+  }, [sessions]);
 
   // Find the most recently completed session
   const lastSession = sessions 
     ? sessions
-        .filter(s => s.status === "completed")
-        .sort((a, b) => new Date(b.checkOutTime).getTime() - new Date(a.checkOutTime).getTime())[0]
+        .filter(s => s.status === "completed" || s.checkOutTime)
+        .sort((a, b) => new Date(b.checkOutTime || b.updatedAt).getTime() - new Date(a.checkOutTime || a.updatedAt).getTime())[0]
     : null;
 
+  console.log("Last session found:", lastSession?.id);
+
+
   // Get orders for this session
-  const { data: orders } = useQuery({
+  const { data: orders = [] } = useQuery<any[]>({
     queryKey: ['/api/orders/session', lastSession?.id],
     enabled: !!lastSession,
   });
 
-  const orderTotal = orders?.reduce((total: number, order: any) => total + order.totalCost, 0) || 0;
-
-  if (!lastSession) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-5 text-center">
-        <div className="animate-spin w-8 h-8 border-4 border-[#06C755] border-t-transparent rounded-full mb-4"></div>
-        <p className="text-gray-600">Loading session details...</p>
-      </div>
-    );
-  }
+  console.log("Orders for session:", orders.length);
+  const orderTotal = orders.reduce((total: number, order: any) => total + order.totalCost, 0) || 0;
+  const resetSession = () => { 
+    // Đặt lại active session thành null
+    setActiveSession(null);
+    clearCart();
+    
+    // Đồng thời invalidate các query để đảm bảo dữ liệu được cập nhật
+    queryClient.invalidateQueries({ queryKey: ['/api/sessions/active'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/sessions/history'] });
+  };
+  const backHome = () => {
+    resetSession();
+    navigate("/");
+  };
+  const backActivity = () => {
+    resetSession();
+    navigate("/activity");
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -62,18 +106,40 @@ export default function SuccessPage() {
           <div className="flex justify-between text-sm mb-2">
             <span className="text-gray-600">Total Time</span>
             <span>
-              {Math.floor(lastSession.totalTime / 3600)}h {Math.floor((lastSession.totalTime % 3600) / 60)}m
+              {lastSession?.totalTime 
+                ? `${Math.floor(lastSession.totalTime / 3600)}h ${Math.floor((lastSession.totalTime % 3600) / 60)}m`
+                : "N/A"}
             </span>
           </div>
+          
+          {/* Debug log */}
+          <div style={{display: 'none'}}>
+            <pre>Orders: {JSON.stringify(orders, null, 2)}</pre>
+            <pre>Order Total: {orderTotal}</pre>
+            <pre>Session total cost: {lastSession?.totalCost}</pre>
+            <pre>Time cost: {lastSession?.totalCost ? (lastSession.totalCost - orderTotal) : "N/A"}</pre>
+          </div>
+          
+          {/* Hiển thị chi phí thời gian (Time cost) */}
+          <div className="flex justify-between text-sm mb-2">
+            <span className="text-gray-600">Time cost</span>
+            <span>¥{lastSession?.totalCost ? (lastSession.totalCost - orderTotal) : "N/A"}</span>
+          </div>
+          
+          {/* Hiển thị chi phí đồ ăn và đồ uống nếu có */}
           {orderTotal > 0 && (
             <div className="flex justify-between text-sm mb-2">
               <span className="text-gray-600">Food & Drinks</span>
               <span>¥{orderTotal}</span>
             </div>
           )}
-          <div className="flex justify-between font-medium">
-            <span>Total Paid</span>
-            <span>¥{lastSession.totalCost}</span>
+          
+          {/* Tổng cộng */}
+          <div className="border-t border-gray-200 pt-3 mt-2">
+            <div className="flex justify-between font-medium">
+              <span>Total Paid</span>
+              <span>¥{lastSession?.totalCost || "N/A"}</span>
+            </div>
           </div>
         </Card>
         
@@ -82,7 +148,7 @@ export default function SuccessPage() {
             variant="primary"
             fullWidth
             className="py-3"
-            onClick={() => navigate("/")}
+            onClick={() => backHome()}
           >
             Back to Home
           </LineButton>
@@ -94,7 +160,7 @@ export default function SuccessPage() {
             onClick={() => {
               // In a real application, this would show a receipt
               // For now, we'll just go back to the activity page
-              navigate("/activity");
+               backActivity();
             }}
           >
             View Receipt

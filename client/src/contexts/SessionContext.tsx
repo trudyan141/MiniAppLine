@@ -12,6 +12,7 @@ interface CartItem {
 
 interface SessionContextType {
   activeSession: Session | null;
+  setActiveSession: React.Dispatch<React.SetStateAction<Session | null>>;
   isLoadingSession: boolean;
   cart: CartItem[];
   addToCart: (item: MenuItem, quantity: number) => void;
@@ -19,6 +20,7 @@ interface SessionContextType {
   clearCart: () => void;
   checkIn: () => Promise<Session>;
   checkOut: () => Promise<Session | null>;
+  startCheckout: () => Promise<Session | null>;
   placeOrder: () => Promise<Order | null>;
   orders: Order[] | null;
   totalOrderAmount: number;
@@ -37,7 +39,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const { 
     data: activeSessionData, 
     isLoading: isLoadingSession 
-  } = useQuery({
+  } = useQuery<Session | null>({
     queryKey: ['/api/sessions/active'],
     enabled: !!user,
     refetchInterval: false,
@@ -133,6 +135,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/sessions/active'] });
       queryClient.invalidateQueries({ queryKey: ['/api/sessions/history'] });
+      setActiveSession(null);
       clearCart();
       toast({
         title: "Checked out",
@@ -218,9 +221,43 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return await placeOrderMutation.mutateAsync();
   };
 
+  // Start checkout function - Lưu tạm session để hiển thị trang checkout mà không kết thúc session
+  const startCheckout = async () => {
+    if (!activeSession) return null;
+    
+    // Lưu session vào sessionStorage để có thể sử dụng ở trang checkout
+    try {
+      // Lấy tất cả orders hiện tại
+      await refetchOrders();
+      
+      // Lưu session và orders vào sessionStorage
+      const sessionData = {
+        ...activeSession,
+        orders: ordersData,
+        orderTotal: totalOrderAmount
+      };
+      
+      // Lưu vào session storage để dùng ở trang checkout
+      sessionStorage.setItem('checkoutSession', JSON.stringify(sessionData));
+      
+      console.log("Saved session for checkout:", sessionData);
+      
+      return activeSession;
+    } catch (error) {
+      console.error("Error preparing for checkout:", error);
+      toast({
+        title: "Checkout preparation failed",
+        description: "Failed to prepare checkout data",
+        variant: "error",
+      });
+      return null;
+    }
+  };
+
   return (
     <SessionContext.Provider value={{
       activeSession,
+      setActiveSession,
       isLoadingSession,
       cart,
       addToCart,
@@ -228,6 +265,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       clearCart,
       checkIn,
       checkOut,
+      startCheckout,
       placeOrder,
       orders,
       totalOrderAmount,

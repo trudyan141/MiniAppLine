@@ -463,8 +463,39 @@ export class DatabaseStorage implements IStorage {
 
   // Session operations
   async getSession(id: number): Promise<Session | undefined> {
-    const [session] = await db.select().from(sessions).where(eq(sessions.id, id));
-    return session || undefined;
+    try {
+      const sqlite = this.db.$client;
+      
+      const stmt = sqlite.prepare(
+        `SELECT * FROM sessions 
+         WHERE id = ? 
+         LIMIT 1`
+      );
+      
+      const row = stmt.get(id);
+      
+      if (!row) {
+        return undefined;
+      }
+      
+      // Đảm bảo giữ nguyên định dạng thời gian từ database
+      // không thực hiện chuyển đổi để tránh vấn đề timezone
+      console.log("Raw session data from DB:", row);
+      
+      return {
+        id: row.id,
+        userId: row.user_id,
+        checkInTime: row.check_in_time,  // Giữ nguyên định dạng gốc
+        checkOutTime: row.check_out_time,
+        status: row.status,
+        totalTime: row.total_time,
+        totalCost: row.total_cost,
+        tableNumber: row.table_number,
+      };
+    } catch (err) {
+      console.error(`Error getting session with ID ${id}:`, err);
+      throw err;
+    }
   }
 
   async getSessionsByUserId(userId: number): Promise<Session[]> {

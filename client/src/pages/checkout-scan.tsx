@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 
 export default function CheckoutScanPage() {
   const [, navigate] = useLocation();
-  const { checkOut } = useSession();
+  const { startCheckout } = useSession();
   const { toast } = useToast();
   const [scanning, setScanning] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -23,11 +23,11 @@ export default function CheckoutScanPage() {
       // In a real implementation, we would validate the QR code data
       // For the demo, accept any QR code 
       if (data) {
-        await checkOut();
+        await startCheckout();
         
         toast({
-          title: "Checked out successfully",
-          description: "Your session has ended. Proceeding to payment...",
+          title: "Checkout prepared",
+          description: "Proceeding to payment...",
           variant: "success",
         });
         
@@ -43,10 +43,26 @@ export default function CheckoutScanPage() {
         setScanning(false);
       }
     } catch (error) {
-      console.error("Failed to check out:", error);
+      console.error("Failed to prepare checkout:", error);
       toast({
-        title: "Check-out failed",
-        description: error instanceof Error ? error.message : "Failed to end your session",
+        title: "Checkout preparation failed",
+        description: error instanceof Error ? error.message : "Failed to prepare checkout",
+        variant: "error",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleManualCheckout = async () => {
+    try {
+      setIsProcessing(true);
+      await startCheckout();
+      navigate("/checkout");
+    } catch (error) {
+      toast({
+        title: "Checkout preparation failed",
+        description: error instanceof Error ? error.message : "Failed to prepare checkout",
         variant: "error",
       });
     } finally {
@@ -110,18 +126,7 @@ export default function CheckoutScanPage() {
           {/* Manual checkout option for testing/debugging */}
           <button 
             className="mt-3 text-sm text-gray-500 underline"
-            onClick={async () => {
-              try {
-                await checkOut();
-                navigate("/checkout");
-              } catch (error) {
-                toast({
-                  title: "Check-out failed",
-                  description: error instanceof Error ? error.message : "Failed to end your session",
-                  variant: "error",
-                });
-              }
-            }}
+            onClick={handleManualCheckout}
           >
             Manual Checkout (For Testing)
           </button>

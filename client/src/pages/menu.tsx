@@ -83,6 +83,7 @@ export default function MenuPage() {
       toast({
         title: "Order placed",
         description: "Your order has been placed successfully",
+        variant: "success",
       });
       navigate("/active-session");
     } catch (error) {

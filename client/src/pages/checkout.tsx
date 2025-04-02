@@ -135,43 +135,118 @@ function CheckoutForm({ sessionId, totalAmount }: { sessionId: number, totalAmou
 export default function CheckoutPage() {
   const [, navigate] = useLocation();
   const { user } = useAuth();
+  const { checkOut, activeSession } = useSession();
   const [stripePromise, setStripePromise] = useState<Promise<any> | null>(null);
+  const [checkoutSessionData, setCheckoutSessionData] = useState<any>(null);
+  const [isLoadingCheckout, setIsLoadingCheckout] = useState(true);
+  const [checkoutCompleted, setCheckoutCompleted] = useState(false);
 
-  // We need to get the session that was just checked out
+  // Lấy dữ liệu checkout từ session storage khi trang được tải
+  useEffect(() => {
+    // Lấy thông tin session từ session storage
+    const sessionDataStr = sessionStorage.getItem('checkoutSession');
+    if (sessionDataStr) {
+      try {
+        const sessionData = JSON.parse(sessionDataStr);
+        console.log("Found checkout data in session storage:", sessionData);
+        setCheckoutSessionData(sessionData);
+        
+        // Thực hiện checkout ngay khi trang được load
+        if (sessionData && sessionData.id) {
+          completeCheckout();
+        }
+      } catch (err) {
+        console.error("Error parsing checkout session data:", err);
+      }
+    }
+    
+    setIsLoadingCheckout(false);
+  }, []);
+
+  // Hoàn tất thanh toán và checkout session
+  const completeCheckout = async () => {
+    try {
+      // Kiểm tra xem có dữ liệu session từ storage không, nếu không dùng activeSession
+      const sessionToUse = checkoutSessionData || activeSession;
+      
+      if (!sessionToUse) {
+        throw new Error("No session data found for checkout");
+      }
+      
+      if (checkoutCompleted) {
+        console.log("Checkout already completed, skipping");
+        return true;
+      }
+      
+      console.log("Completing checkout for session:", sessionToUse.id);
+      
+      // Nếu session đã có status completed hoặc có checkOutTime, báo là đã checkout xong
+      if (sessionToUse.status === "completed" || sessionToUse.checkOutTime) {
+        console.log("Session is already checked out");
+        setCheckoutCompleted(true);
+        return true;
+      }
+      
+      // Kiểm tra xem activeSession có tồn tại không để gọi API checkout
+      if (!activeSession) {
+        console.log("No active session found, but using stored checkout data");
+        setCheckoutCompleted(true);
+        return true;
+      }
+      
+      // Gọi API checkout thực sự
+      await checkOut();
+      console.log("Session checked out successfully");
+      setCheckoutCompleted(true);
+      return true;
+    } catch (error) {
+      console.error("Error completing checkout:", error);
+      return false;
+    }
+  };
+
+  // Sử dụng lại các query chỉ khi không có session data từ storage
   const { data: sessions } = useQuery<any[]>({
     queryKey: ['/api/sessions/history'],
-    enabled: !!user,
+    enabled: !!user && !checkoutSessionData,
   });
-
-  // Get the most recently completed session
-  const session = sessions?.find(s => s.status === "completed");
 
   // Get orders for this session
   const { data: orders = [] } = useQuery<any[]>({
-    queryKey: ['/api/orders/session', session?.id],
-    enabled: !!session,
+    queryKey: ['/api/orders/session', checkoutSessionData?.id],
+    enabled: !!checkoutSessionData?.id,
   });
-
-  const orderTotal = orders.reduce((total: number, order: any) => total + order.totalCost, 0) || 0;
 
   useEffect(() => {
     setStripePromise(getStripe());
   }, []);
 
-  if (!session) {
+  // Use stored session data if available, otherwise fallback to query result
+  const session = checkoutSessionData || sessions?.find(s => s.status === "active");
+
+  if (isLoadingCheckout || !session) {
     return (
       <div className="min-h-screen bg-white p-5 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin w-8 h-8 border-4 border-[#06C755] border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading session details...</p>
+          <p className="text-gray-600">Loading checkout details...</p>
         </div>
       </div>
     );
   }
 
+  // Calculate order total - prioritize stored value if available
+  const orderTotal = checkoutSessionData?.orderTotal || 
+                    orders.reduce((total: number, order: any) => total + order.totalCost, 0) || 0;
+  console.log("Orders:", orders);
+  console.log("Order total:", orderTotal);
+
+  // Parse thời gian
   const checkInTime = new Date(session.checkInTime);
-  const checkOutTime = new Date(session.checkOutTime);
+  // For checkout, we use current time as we haven't checked out yet
+  const checkOutTime = checkoutSessionData?.checkOutTime ? new Date(checkoutSessionData.checkOutTime) : new Date();
   
+  // Format theo định dạng giờ địa phương
   const formattedCheckInTime = checkInTime.toLocaleTimeString('en-US', {
     hour: '2-digit',
     minute: '2-digit',
@@ -183,12 +258,16 @@ export default function CheckoutPage() {
     minute: '2-digit',
     hour12: false,
   });
-
-  // Calculate time cost by subtracting order costs from the total
-  const timeCost = session.totalCost - orderTotal;
-  console.log("Session total cost:", session.totalCost);
-  console.log("Order total:", orderTotal);
-  console.log("Time cost:", timeCost);
+  
+  // Tính toán tổng thời gian dự kiến (chưa checkout)
+  const expectedTimeDiffSeconds = Math.floor((checkOutTime.getTime() - checkInTime.getTime()) / 1000);
+  const expectedTimeFormatted = formatTime(Math.max(900, expectedTimeDiffSeconds)); // Tối thiểu 15 phút
+  
+  // Calculate time cost (500 yen cho 15 phút đầu tiên)
+  const timeCost = 500;
+  
+  // Tổng chi phí dự kiến
+  const expectedTotalCost = timeCost + orderTotal;
 
   return (
     <div className="min-h-screen bg-white">
@@ -225,10 +304,15 @@ export default function CheckoutPage() {
               </svg>
             </div>
             <div>
-              <p className="text-gray-600 text-sm">Total Time</p>
+              <p className="text-gray-600 text-sm">Total Time (Billing)</p>
               <h2 className="text-lg font-bold text-gray-900">
                 {formatTime(session.totalTime)}
               </h2>
+              {expectedTimeDiffSeconds < 60 && (
+                <p className="text-xs text-gray-500">
+                  Expected: {expectedTimeDiffSeconds}s (min. charge 15m)
+                </p>
+              )}
             </div>
           </div>
           
@@ -291,7 +375,7 @@ export default function CheckoutPage() {
           <div className="border-t border-gray-200 pt-3">
             <div className="flex justify-between font-medium">
               <span>Total</span>
-              <span className="text-[#06C755]">¥{session.totalCost}</span>
+              <span className="text-[#06C755]">¥{expectedTotalCost}</span>
             </div>
           </div>
         </Card>
@@ -329,7 +413,7 @@ export default function CheckoutPage() {
           <Elements stripe={stripePromise}>
             <CheckoutForm 
               sessionId={session.id} 
-              totalAmount={session.totalCost} 
+              totalAmount={expectedTotalCost} 
             />
           </Elements>
         )}

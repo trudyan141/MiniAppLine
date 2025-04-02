@@ -27,15 +27,21 @@ export default function ActiveSessionPage() {
 
   // Redirect if no active session or handle completed session
   useEffect(() => {
+    // Nếu không có session hoặc session đã kết thúc, điều hướng về trang chủ
     if (!activeSession) {
+      console.log("No active session, redirecting to home");
       navigate("/");
     } else if (activeSession.status === "completed") {
+      console.log("Session completed, redirecting to home");
       toast({
         title: "Session ended",
         description: "Your session has already ended. Please check in again to start a new session.",
         variant: "destructive",
       });
-      navigate("/");
+      // Đặt lại activeSession thành null
+      setTimeout(() => {
+        navigate("/");
+      }, 1000);
     }
   }, [activeSession, navigate, toast]);
 

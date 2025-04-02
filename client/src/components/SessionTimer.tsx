@@ -14,11 +14,17 @@ export default function SessionTimer({ session, onTimeUpdate }: SessionTimerProp
   const [initialSeconds, setInitialSeconds] = useState<number>(0);
   
   useEffect(() => {
+    console.log("============== DEBUG SESSION TIMER ==============");
+    console.log("Full session object:", session);
+    
     // Xử lý an toàn chuỗi thời gian
     try {
-      // Lấy chuỗi thời gian từ session
-      const checkInTimeStr = session.checkInTime;
-      console.log("Raw checkInTime:", checkInTimeStr);
+      // Ưu tiên sử dụng originalCheckInTime nếu có
+      const checkInTimeStr = (session as any).originalCheckInTime || session.checkInTime;
+      console.log("Using checkInTime:", checkInTimeStr);
+      console.log("Original checkInTime:", (session as any).originalCheckInTime);
+      console.log("Regular checkInTime:", session.checkInTime);
+      console.log("Type of checkInTime:", typeof checkInTimeStr);
       
       // Tạo đối tượng Date từ chuỗi thời gian
       let startTime: Date;
@@ -26,7 +32,11 @@ export default function SessionTimer({ session, onTimeUpdate }: SessionTimerProp
       if (typeof checkInTimeStr === 'string') {
         // Nếu là chuỗi ISO, sử dụng trực tiếp
         startTime = new Date(checkInTimeStr);
-        console.log("Parsed date:", startTime);
+        console.log("Parsed date object:", startTime);
+        console.log("Date.getTime():", startTime.getTime());
+        console.log("Is valid date:", !isNaN(startTime.getTime()));
+        console.log("Local time string:", startTime.toLocaleString());
+        console.log("ISO string:", startTime.toISOString());
         
         // Kiểm tra xem date có hợp lệ không
         if (isNaN(startTime.getTime())) {
@@ -40,9 +50,16 @@ export default function SessionTimer({ session, onTimeUpdate }: SessionTimerProp
         startTime = new Date();
       }
       
+      // Log thời gian hiện tại cho so sánh
+      const now = new Date();
+      console.log("Current time:", now);
+      console.log("Current timestamp:", now.getTime());
+      
       // Tính thời gian đã trôi qua tính bằng giây
-      const seconds = Math.floor((Date.now() - startTime.getTime()) / 1000);
-      console.log("Calculated seconds:", seconds);
+      const seconds = Math.floor((now.getTime() - startTime.getTime()) / 1000);
+      console.log("Elapsed time in seconds:", seconds);
+      console.log("Elapsed time (hours:minutes):", 
+        `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`);
       
       // Đảm bảo số giây là số dương
       const validSeconds = seconds > 0 ? seconds : 0;
@@ -52,6 +69,7 @@ export default function SessionTimer({ session, onTimeUpdate }: SessionTimerProp
       // Trong trường hợp lỗi, sử dụng 0 làm giá trị mặc định
       setInitialSeconds(0);
     }
+    console.log("================================================");
   }, [session.checkInTime]);
   
   const timer = useTimer({

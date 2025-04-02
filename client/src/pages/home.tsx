@@ -6,11 +6,20 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useSession } from "@/contexts/SessionContext";
 import ActivityCard from "@/components/ActivityCard";
 import { Session } from "@shared/schema";
+import { useEffect } from "react";
 
 export default function HomePage() {
   const { user } = useAuth();
-  const { activeSession } = useSession();
+  const { activeSession, setActiveSession } = useSession();
   const [, navigate] = useLocation();
+
+  // Kiểm tra và reset session nếu session đã completed
+  useEffect(() => {
+    if (activeSession && activeSession.status === "completed") {
+      console.log("Home: Resetting completed session");
+      setActiveSession(null);
+    }
+  }, [activeSession, setActiveSession]);
 
   // Fetch user's session history
   const { data: sessionHistory } = useQuery<Session[]>({

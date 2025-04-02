@@ -17,23 +17,34 @@ export function formatISODate(date: Date | string | number | null | undefined): 
       return null;
     }
     
-    // Nếu là Date object hợp lệ, sử dụng getUTC methods để đảm bảo format đúng 
+    // Nếu là Date object hợp lệ, sử dụng toISOString() để đảm bảo format đúng chuẩn
     if (date instanceof Date && !isNaN(date.getTime())) {
-      return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}T${String(date.getUTCHours()).padStart(2, '0')}:${String(date.getUTCMinutes()).padStart(2, '0')}:${String(date.getUTCSeconds()).padStart(2, '0')}.${String(date.getUTCMilliseconds()).padStart(3, '0')}Z`;
+      return date.toISOString();
     }
     
-    // Nếu là chuỗi, trả về luôn
+    // Nếu là chuỗi, kiểm tra xem có đúng format ISO không
     if (typeof date === 'string') {
-      return date;
+      // Nếu đã là định dạng ISO chuẩn, trả về nguyên vẹn
+      if (date.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/)) {
+        return date;
+      }
+      
+      // Nếu không, thử chuyển đổi thành Date và format lại
+      const dateObj = new Date(date);
+      if (!isNaN(dateObj.getTime())) {
+        return dateObj.toISOString();
+      }
     }
     
-    // Nếu là số hoặc chuỗi, tạo Date mới và thử lại
-    const newDate = new Date(date);
-    if (!isNaN(newDate.getTime())) {
-      return formatISODate(newDate);
+    // Nếu là số, tạo Date mới và gọi toISOString()
+    if (typeof date === 'number') {
+      const dateObj = new Date(date);
+      if (!isNaN(dateObj.getTime())) {
+        return dateObj.toISOString();
+      }
     }
     
-    // Fallback cho trường hợp không thể chuyển đổi
+    // Log lỗi và trả về null nếu không thể chuyển đổi
     console.warn("Invalid date provided to formatISODate:", date);
     return null;
   } catch (error) {

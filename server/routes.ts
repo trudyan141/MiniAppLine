@@ -564,29 +564,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Session is not active" });
       }
       
-      // Sử dụng hàm tiện ích để tạo chuỗi ISO an toàn
+      // Sử dụng toISOString() trực tiếp thay vì formatISODate
       const now = new Date();
       console.log("Checkout - Current date object:", now);
       
-      const checkOutTimeStr = formatISODate(now);
+      const checkOutTimeStr = now.toISOString();
       console.log("Checkout time ISO string:", checkOutTimeStr);
       
-      // Parse checkInTime safely
-      let checkInTime;
+      // Kiểm tra và xử lý checkInTime một cách chặt chẽ hơn
+      if (!session.checkInTime) {
+        console.error("Session has no check-in time:", session);
+        return res.status(400).json({ message: "Invalid check-in time in session data" });
+      }
+      
+      // Parse checkInTime safely - cải thiện cách xử lý
+      let checkInTime = new Date();
       try {
-        // Chuyển đổi checkInTime thành Date object
-        checkInTime = new Date(session.checkInTime);
-        console.log("Parsed checkInTime:", checkInTime);
+        console.log("CheckInTime from session:", session.checkInTime);
+        console.log("Type of checkInTime:", typeof session.checkInTime);
         
-        if (isNaN(checkInTime.getTime())) {
-          throw new Error("Invalid date");
+        // Nếu là chuỗi
+        if (typeof session.checkInTime === 'string') {
+          // Đảm bảo chuỗi thời gian hợp lệ
+          if (!session.checkInTime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/)) {
+            throw new Error("Invalid ISO date format");
+          }
+          
+          const parsedDate = new Date(session.checkInTime);
+          if (isNaN(parsedDate.getTime())) {
+            throw new Error("Invalid date after parsing");
+          }
+          checkInTime = parsedDate;
+          console.log("Successfully parsed checkInTime string:", checkInTime);
+        } 
+        // Nếu đã là đối tượng Date
+        else if (session.checkInTime instanceof Date) {
+          if (isNaN(session.checkInTime.getTime())) {
+            throw new Error("Invalid Date object for checkInTime");
+          }
+          checkInTime = session.checkInTime;
+          console.log("Using Date object for checkInTime:", checkInTime);
+        } 
+        // Trường hợp khác - không hỗ trợ
+        else {
+          throw new Error(`Unsupported checkInTime type: ${typeof session.checkInTime}`);
         }
       } catch (error) {
         console.error("Error parsing checkInTime:", error, "Value:", session.checkInTime);
         return res.status(400).json({ message: "Invalid check-in time in session data" });
       }
       
-      const totalTimeSeconds = Math.floor((now.getTime() - checkInTime.getTime()) / 1000);
+      // Đảm bảo khoảng thời gian hợp lý (tối thiểu 15 phút)
+      const minSessionTime = 15 * 60 * 1000; // 15 phút 
+      const sessionDuration = now.getTime() - checkInTime.getTime();
+      
+      // Log thời gian thực tế để debug
+      console.log("Actual session duration (ms):", sessionDuration);
+      console.log("Actual session duration (minutes):", sessionDuration / (60 * 1000));
+      
+      let adjustedCheckInTime = checkInTime;
+      if (sessionDuration < minSessionTime) {
+        adjustedCheckInTime = new Date(now.getTime() - minSessionTime);
+        console.log("Adjusted to minimum session time. New checkInTime:", adjustedCheckInTime);
+      }
+      
+      // Tính thời gian phiên (đảm bảo có giá trị nguyên - số giây)
+      const totalTimeSeconds = Math.floor((now.getTime() - adjustedCheckInTime.getTime()) / 1000);
+      console.log("Total time seconds:", totalTimeSeconds);
+      console.log("Total time (minutes):", totalTimeSeconds / 60);
+      console.log("Total time (hours:minutes):", Math.floor(totalTimeSeconds / 3600) + ":" + Math.floor((totalTimeSeconds % 3600) / 60));
       
       // Calculate total cost based on time
       // First hour: 500 yen
@@ -604,13 +650,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Add costs from orders
       const orders = await storage.getOrdersBySessionId(sessionId);
-      const ordersCost = orders.reduce((sum: number, order: { totalCost: number }) => sum + order.totalCost, 0);
+      const orderTotal = orders.reduce((total: number, order: any) => total + order.totalCost, 0);
       
       // Log the order information for debugging
       console.log("Orders found:", orders.length);
-      console.log("Total order cost:", ordersCost);
+      console.log("Total order cost:", orderTotal);
       
-      totalCost += ordersCost;
+      totalCost += orderTotal;
       
       // First mark session as completed by directly updating the status
       await storage.updateSession(sessionId, { status: "completed" });
@@ -627,6 +673,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json(updatedSession);
     } catch (err: any) {
+      console.error("Check-out error:", err);
       res.status(400).json({ message: err.message });
     }
   });
@@ -643,7 +690,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "No active session found" });
       }
       
-      res.json(session);
+      // Đảm bảo thời gian check-in được trả về đúng định dạng
+      // và không thay đổi khi gọi API khác nhau
+      if (session.checkInTime) {
+        console.log("Active session API - Raw checkInTime:", session.checkInTime);
+        if (typeof session.checkInTime === 'string') {
+          // Đảm bảo chuỗi ISO không bị thay đổi
+          try {
+            // Tạo date object tạm thời để kiểm tra tính hợp lệ
+            const testDate = new Date(session.checkInTime);
+            if (isNaN(testDate.getTime())) {
+              console.error("Invalid date string in active session:", session.checkInTime);
+              // Không thay đổi chuỗi gốc nếu không hợp lệ
+            }
+          } catch (error) {
+            console.error("Error parsing date in active session:", error);
+          }
+        }
+      }
+      
+      // Lưu lại giá trị checkInTime gốc cho client
+      const responseSession = {
+        ...session,
+        originalCheckInTime: session.checkInTime
+      };
+      
+      res.json(responseSession);
     } catch (err: any) {
       res.status(400).json({ message: err.message });
     }
@@ -780,6 +852,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       let sessionId: number;
+      let filterByStatus = req.query.status as string | undefined;
       
       // If no sessionId provided, try to use active session
       if (!req.params.sessionId) {
@@ -802,7 +875,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Not authorized" });
       }
       
-      const orders = await storage.getOrdersBySessionId(sessionId);
+      // Lấy tất cả orders của session
+      let orders = await storage.getOrdersBySessionId(sessionId);
+      
+      // Nếu là trang success (session đã completed), tự động lọc orders để chỉ lấy các orders completed
+      if (session.status === "completed" && !filterByStatus) {
+        console.log("Session is completed, automatically filtering orders to completed status");
+        
+        // Nếu trang success nhưng orders vẫn pending, tự động cập nhật trạng thái orders thành completed
+        for (const order of orders as any[]) {
+          if (order.status === "pending") {
+            console.log(`Auto-updating order ${order.id} from pending to completed for completed session`);
+            await storage.updateOrderStatus(order.id, "completed");
+          }
+        }
+        
+        // Lấy lại orders với trạng thái đã cập nhật
+        orders = await storage.getOrdersBySessionId(sessionId);
+      }
+      // Nếu có filter status, lọc orders theo status
+      else if (filterByStatus) {
+        console.log(`Filtering orders by status: ${filterByStatus}`);
+        orders = orders.filter((order: any) => order.status === filterByStatus);
+      }
       
       // For each order, get order items
       const ordersWithItems = await Promise.all(
@@ -832,9 +927,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log("Get orders API - Total order amount:", totalAmount);
       console.log("Get orders API - Orders with items:", ordersWithItems.length);
+      console.log("Get orders API - Orders statuses:", orders.map(o => o.status).join(", "));
       
       res.json(ordersWithItems);
     } catch (err: any) {
+      console.error("Error getting orders:", err);
       res.status(400).json({ message: err.message });
     }
   });
@@ -859,8 +956,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Not authorized" });
       }
       
-      if (session.status !== "completed") {
-        return res.status(400).json({ message: "Session is not completed" });
+      // Cho phép thanh toán cho session đang active (không cần status="completed")
+      // Tính toán số tiền dựa trên thời gian hiện tại và các đơn hàng đã đặt
+      let totalCost = 0;
+      
+      if (session.status === "completed") {
+        // Nếu session đã completed, sử dụng totalCost từ database
+        totalCost = session.totalCost!;
+      } else {
+        // Session vẫn đang active, tính toán chi phí dự kiến
+        // 1. Tính chi phí thời gian (cố định 500 yên cho phí ban đầu)
+        const timeCost = 500;
+        
+        // 2. Lấy tổng chi phí đơn hàng
+        const orders = await storage.getOrdersBySessionId(sessionId);
+        const orderTotal = orders.reduce((total: number, order: any) => total + order.totalCost, 0);
+        
+        // 3. Tổng chi phí = chi phí thời gian + chi phí đơn hàng
+        totalCost = timeCost + orderTotal;
       }
       
       // Truy vấn SQLite trực tiếp để lấy thông tin user và stripe_customer_id
@@ -883,7 +996,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const paymentData = insertPaymentSchema.parse({
           userId: userId,
           sessionId: sessionId,
-          amount: session.totalCost!,
+          amount: totalCost,
         });
         
         const payment = await storage.createPayment(paymentData);
@@ -891,7 +1004,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Check if Stripe is initialized
         if (!stripe) {
           // Mock API for development when Stripe API key is not set
-          console.log("[MOCK API] Creating fake payment intent for amount:", session.totalCost);
+          console.log("[MOCK API] Creating fake payment intent for amount:", totalCost);
           
           return res.json({
             paymentId: payment.id,
@@ -902,7 +1015,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Create payment intent
         const paymentIntent = await stripe.paymentIntents.create({
-          amount: Math.round(session.totalCost! * 100), // Convert to cents
+          amount: Math.round(totalCost * 100), // Convert to cents
           currency: "jpy",
           customer: user.stripe_customer_id,
         });
@@ -939,14 +1052,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Not authorized" });
       }
       
+      // Cập nhật trạng thái payment
       const updatedPayment = await storage.updatePaymentStatus(
         paymentId,
         "completed",
         stripePaymentId
       );
       
-      res.json(updatedPayment);
+      // Lấy session ID từ payment để cập nhật orders
+      const sessionId = payment.sessionId;
+      
+      // Lấy tất cả orders của session
+      const sessionOrders = await storage.getOrdersBySessionId(sessionId);
+      
+      // Cập nhật trạng thái của tất cả orders sang "completed"
+      console.log(`Updating ${sessionOrders.length} orders for session ${sessionId} to completed`);
+      for (const order of sessionOrders) {
+        await storage.updateOrderStatus(order.id, "completed");
+      }
+      
+      // Thông báo thành công
+      res.json({
+        payment: updatedPayment,
+        ordersUpdated: sessionOrders.length
+      });
     } catch (err: any) {
+      console.error("Error confirming payment:", err);
       res.status(400).json({ message: err.message });
     }
   });
