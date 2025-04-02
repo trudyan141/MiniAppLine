@@ -52,7 +52,7 @@ export default function MenuCard({
         toast({
           title: "No active session",
           description: "You need to check in first before ordering",
-          variant: "destructive",
+          variant: "error",
         });
         return;
       }
@@ -62,6 +62,7 @@ export default function MenuCard({
       toast({
         title: "Added to cart",
         description: `Added ${quantity} ${item.name} to your order`,
+        variant: "success",
       });
     } catch (error) {
       console.log("🚀 ~ handleAddToOrder ~ error:", error)

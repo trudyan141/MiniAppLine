@@ -42,7 +42,7 @@ function CheckoutForm({ sessionId, totalAmount }: { sessionId: number, totalAmou
         toast({
           title: "Error",
           description: "Failed to initialize payment. Please try again.",
-          variant: "destructive",
+          variant: "error",
         });
       }
     };
@@ -77,6 +77,7 @@ function CheckoutForm({ sessionId, totalAmount }: { sessionId: number, totalAmou
         toast({
           title: "Payment successful",
           description: "Thank you for your visit!",
+          variant: "success",
         });
         
         navigate("/success");
@@ -86,7 +87,7 @@ function CheckoutForm({ sessionId, totalAmount }: { sessionId: number, totalAmou
       toast({
         title: "Payment failed",
         description: error instanceof Error ? error.message : "Failed to process payment",
-        variant: "destructive",
+        variant: "error",
       });
     } finally {
       setIsProcessing(false);
@@ -146,12 +147,12 @@ export default function CheckoutPage() {
   const session = sessions?.find(s => s.status === "completed");
 
   // Get orders for this session
-  const { data: orders } = useQuery({
+  const { data: orders = [] } = useQuery<any[]>({
     queryKey: ['/api/orders/session', session?.id],
     enabled: !!session,
   });
 
-  const orderTotal = orders?.reduce((total: number, order: any) => total + order.totalCost, 0) || 0;
+  const orderTotal = orders.reduce((total: number, order: any) => total + order.totalCost, 0) || 0;
 
   useEffect(() => {
     setStripePromise(getStripe());

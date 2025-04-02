@@ -41,6 +41,7 @@ export default function CheckInPage({ liff }: { liff: any }) {
       toast({
         title: "LINE Account Required",
         description: "Please return to login and connect your LINE account first.",
+        variant: "error",
       });
       return;
     }
@@ -58,6 +59,7 @@ export default function CheckInPage({ liff }: { liff: any }) {
       toast({
         title: "Check-in successful",
         description: "You have been checked in successfully",
+        variant: "success",
       });
       navigate("/");
       // Other success handling

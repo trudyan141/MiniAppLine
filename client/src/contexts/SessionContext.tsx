@@ -95,7 +95,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       toast({
         title: "No active session",
         description: "You need to check in first before adding items to cart",
-        variant: "destructive",
+        variant: "error",
       });
       return;
     }
@@ -137,13 +137,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       toast({
         title: "Checked out",
         description: "Your session has ended. Thank you for visiting Time Cafe!",
+        variant: "success",
       });
     },
     onError: (error) => {
       toast({
         title: "Check-out failed",
         description: error instanceof Error ? error.message : "Failed to end your session",
-        variant: "destructive",
+        variant: "error",
       });
     },
   });
@@ -194,6 +195,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       toast({
         title: "Order placed",
         description: "Your order has been placed successfully.",
+        variant: "success",
       });
     },
     onError: (error) => {
@@ -201,7 +203,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       toast({
         title: "Order failed",
         description: error instanceof Error ? error.message : "Failed to place your order",
-        variant: "destructive",
+        variant: "error",
       });
     },
   });

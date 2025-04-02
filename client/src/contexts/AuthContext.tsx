@@ -94,13 +94,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       toast({
         title: "Logged in successfully",
         description: `Welcome back, ${data.user?.fullName || data.fullName}!`,
+        variant: "success",
       });
     } catch (error) {
       console.error('Failed to login:', error);
       toast({
         title: "Login failed",
         description: error instanceof Error ? error.message : "Invalid credentials",
-        variant: "destructive",
+        variant: "error",
       });
       throw error;
     } finally {
@@ -133,13 +134,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       toast({
         title: "Registration successful",
         description: `Welcome to Time Cafe, ${data.user?.fullName || data.fullName}!`,
+        variant: "success",
       });
     } catch (error) {
       console.error('Failed to register:', error);
       toast({
         title: "Registration failed",
         description: error instanceof Error ? error.message : "Failed to create account",
-        variant: "destructive",
+        variant: "error",
       });
       throw error;
     } finally {
@@ -155,13 +157,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       toast({
         title: "Logged out",
         description: "You have been successfully logged out",
+        variant: "success",
       });
     } catch (error) {
       console.error('Failed to logout:', error);
       toast({
         title: "Logout failed",
         description: "There was an error logging out",
-        variant: "destructive",
+        variant: "error",
       });
     } finally {
       setIsLoading(false);
@@ -183,6 +186,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         toast({
           title: "Logged in with LINE",
           description: `Welcome back, ${userData.fullName}!`,
+          variant: "success",
         });
       } catch (error: any) {
         // If error contains needsRegister, the user needs to register first
@@ -190,7 +194,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           toast({
             title: "LINE Account Not Registered",
             description: "Please register your LINE account first",
-            variant: "destructive",
+            variant: "error",
           });
           throw new Error("LINE_NOT_REGISTERED");
         } else {
@@ -203,7 +207,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         toast({
           title: "LINE Login Failed",
           description: error.message || "Could not login with LINE",
-          variant: "destructive",
+          variant: "error",
         });
       }
       throw error;
@@ -231,13 +235,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       toast({
         title: "Registration Successful",
         description: `Welcome to Time Cafe, ${newUser.fullName}!`,
+        variant: "success",
       });
     } catch (error) {
       console.error("Failed to register with LINE:", error);
       toast({
         title: "Registration Failed",
         description: error instanceof Error ? error.message : "Could not register with LINE",
-        variant: "destructive",
+        variant: "error",
       });
       throw error;
     } finally {

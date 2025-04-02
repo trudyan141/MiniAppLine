@@ -28,6 +28,7 @@ export default function CheckoutScanPage() {
         toast({
           title: "Checked out successfully",
           description: "Your session has ended. Proceeding to payment...",
+          variant: "success",
         });
         
         navigate("/checkout");
@@ -37,7 +38,7 @@ export default function CheckoutScanPage() {
         toast({
           title: "Invalid QR code",
           description: "Please scan the checkout QR code located at the exit",
-          variant: "destructive",
+          variant: "error",
         });
         setScanning(false);
       }
@@ -46,7 +47,7 @@ export default function CheckoutScanPage() {
       toast({
         title: "Check-out failed",
         description: error instanceof Error ? error.message : "Failed to end your session",
-        variant: "destructive",
+        variant: "error",
       });
     } finally {
       setIsProcessing(false);
@@ -117,7 +118,7 @@ export default function CheckoutScanPage() {
                 toast({
                   title: "Check-out failed",
                   description: error instanceof Error ? error.message : "Failed to end your session",
-                  variant: "destructive",
+                  variant: "error",
                 });
               }
             }}

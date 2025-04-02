@@ -28,7 +28,7 @@ function PaymentForm() {
         toast({
           title: "Error",
           description: "Failed to set up payment method. Please try again.",
-          variant: "destructive",
+          variant: "error",
         });
       }
     }
@@ -69,6 +69,7 @@ function PaymentForm() {
       toast({
         title: "Payment method added",
         description: "Your card has been registered successfully.",
+        variant: "success",
       });
 
       // Navigate to home page after successful registration
@@ -79,7 +80,7 @@ function PaymentForm() {
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to register payment method",
-        variant: "destructive",
+        variant: "error",
       });
     } finally {
       setIsProcessing(false);

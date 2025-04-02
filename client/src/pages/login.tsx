@@ -23,7 +23,7 @@ export default function LoginPage({ liff }: { liff: any }) {
       toast({
         title: "Error",
         description: "Please enter both username and password",
-        variant: "destructive",
+        variant: "error",
       });
       return;
     }
@@ -57,7 +57,7 @@ export default function LoginPage({ liff }: { liff: any }) {
         toast({
           title: "LINE Login Error",
           description: "There was an error logging in with LINE. Please try again.",
-          variant: "destructive",
+          variant: "error",
         });
       }
     } finally {
