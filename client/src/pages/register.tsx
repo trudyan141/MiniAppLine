@@ -66,20 +66,20 @@ export default function RegisterPage({ liff }: { liff: any }) {
     try {
       setIsSubmitting(true);
       
-      // If user has LINE connected, use LINE registration
-      if (isLineConnected && lineProfile) {
-        // Register with LINE - only need email and optional phone/DOB from form
-        await registerWithLINE(liff, {
-          email: data.email,
-          phoneNumber: data.phoneNumber || undefined,
-          dateOfBirth: data.dateOfBirth || undefined,
-        });
-      } else {
+      // // If user has LINE connected, use LINE registration
+      // if (isLineConnected && lineProfile) {
+      //   // Register with LINE - only need email and optional phone/DOB from form
+      //   await registerWithLINE(liff, {
+      //     email: data.email,
+      //     phoneNumber: data.phoneNumber || undefined,
+      //     dateOfBirth: data.dateOfBirth || undefined,
+      //   });
+      // } else {
         // Standard registration with username/password
         // Remove confirmPassword and agreeToTerms before sending to API
         const { confirmPassword, agreeToTerms, ...userData } = data;
         await registerUser(userData);
-      }
+      //}
       
       // Regardless of registration method, redirect to payment registration
       navigate("/payment-registration");
