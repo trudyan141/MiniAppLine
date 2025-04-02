@@ -43,6 +43,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     refetchInterval: false,
   });
 
+  // Update activeSession state when data changes
+  useEffect(() => {
+    if (activeSessionData) {
+      setActiveSession(activeSessionData);
+    }
+  }, [activeSessionData]);
+
   // Fetch orders for active session
   const { 
     data: ordersData,

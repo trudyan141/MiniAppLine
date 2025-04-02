@@ -346,14 +346,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Not authenticated" });
       }
       
-      const user = await storage.getUser(userId);
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
+      // Sử dụng truy vấn SQLite trực tiếp để đảm bảo có stripe_customer_id
+      try {
+        const sqlite = (db as any).$client;
+        
+        // Get user
+        const getUserStmt = sqlite.prepare('SELECT * FROM users WHERE id = ?');
+        const user = getUserStmt.get(userId);
+        
+        if (!user) {
+          return res.status(404).json({ message: "User not found" });
+        }
+        
+        // Ánh xạ từ snake_case sang camelCase
+        const userData = {
+          id: user.id,
+          username: user.username,
+          fullName: user.full_name,
+          email: user.email,
+          phoneNumber: user.phone_number,
+          dateOfBirth: user.date_of_birth,
+          registeredAt: user.registered_at,
+          // Ánh xạ stripe_customer_id sang stripeCustomerId
+          stripeCustomerId: user.stripe_customer_id
+        };
+        
+        // Trả về user data
+        res.json(userData);
+      } catch (dbError: any) {
+        console.error('[API] Database error:', dbError);
+        res.status(500).json({ message: `Database error: ${dbError.message}` });
       }
-      
-      // Return user without password
-      const { password, ...userWithoutPassword } = user;
-      res.json(userWithoutPassword);
     } catch (err: any) {
       res.status(400).json({ message: err.message });
     }
@@ -421,27 +444,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Not authenticated" });
       }
       
-      const user = await storage.getUser(userId);
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-      
-      if (!user.stripeCustomerId) {
-        return res.status(400).json({ message: "Stripe customer not set up" });
-      }
-      
-      // Check if Stripe is initialized
-      if (!stripe) {
-        return res.status(500).json({ 
-          message: "Stripe is not configured. Please set STRIPE_SECRET_KEY environment variable."
+      // Direct database queries
+      try {
+        const sqlite = (db as any).$client;
+        
+        // Get user
+        const getUserStmt = sqlite.prepare('SELECT * FROM users WHERE id = ?');
+        const user = getUserStmt.get(userId);
+        
+        if (!user) {
+          return res.status(404).json({ message: "User not found" });
+        }
+        
+        if (!user.stripe_customer_id) {
+          return res.status(400).json({ message: "Stripe customer not set up" });
+        }
+        
+        // Check if Stripe is initialized
+        if (!stripe) {
+          return res.status(500).json({ 
+            message: "Stripe is not configured. Please set STRIPE_SECRET_KEY environment variable."
+          });
+        }
+        
+        const setupIntent = await stripe.setupIntents.create({
+          customer: user.stripe_customer_id,
         });
+        
+        res.json({ clientSecret: setupIntent.client_secret });
+      } catch (dbError: any) {
+        console.error('[Stripe API] Database error:', dbError);
+        res.status(500).json({ message: `Database error: ${dbError.message}` });
       }
-      
-      const setupIntent = await stripe.setupIntents.create({
-        customer: user.stripeCustomerId,
-      });
-      
-      res.json({ clientSecret: setupIntent.client_secret });
     } catch (err: any) {
       res.status(400).json({ message: err.message });
     }
@@ -457,18 +491,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Check if user already has an active session
       const activeSession = await storage.getActiveSessionByUserId(userId);
+      console.log("🚀 ~ app.post ~ activeSession:", activeSession)
       if (activeSession) {
         return res.status(400).json({ message: "User already has an active session" });
       }
       
+      // Convert Date to ISO string since the schema expects a string
       const sessionData = insertSessionSchema.parse({
         userId,
-        checkInTime: new Date().toISOString(),
+        checkInTime: new Date().toISOString(), // Convert to ISO string
       });
       
       const session = await storage.createSession(sessionData);
       res.status(201).json(session);
     } catch (err: any) {
+      console.error("Check-in error:", err);
       res.status(400).json({ message: err.message });
     }
   });
@@ -760,43 +797,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Session is not completed" });
       }
       
-      const user = await storage.getUser(userId);
-      if (!user?.stripeCustomerId) {
-        return res.status(400).json({ message: "User does not have a payment method set up" });
-      }
-      
-      // Create payment in our database first
-      const paymentData = insertPaymentSchema.parse({
-        userId,
-        sessionId,
-        amount: session.totalCost!,
-      });
-      
-      const payment = await storage.createPayment(paymentData);
-      
-      // Check if Stripe is initialized
-      if (!stripe) {
-        // Mock API for development when Stripe API key is not set
-        console.log("[MOCK API] Creating fake payment intent for amount:", session.totalCost);
+      // Truy vấn SQLite trực tiếp để lấy thông tin user và stripe_customer_id
+      try {
+        const sqlite = (db as any).$client;
         
-        return res.json({
-          paymentId: payment.id,
-          clientSecret: `mock_pi_secret_${payment.id}_${Date.now()}`,
-          note: "This is a mock client secret. Set STRIPE_SECRET_KEY to use real Stripe integration."
+        // Get user
+        const getUserStmt = sqlite.prepare('SELECT * FROM users WHERE id = ?');
+        const user = getUserStmt.get(userId);
+        
+        if (!user) {
+          return res.status(404).json({ message: "User not found" });
+        }
+        
+        if (!user.stripe_customer_id) {
+          return res.status(400).json({ message: "User does not have a payment method set up" });
+        }
+        
+        // Create payment in our database first
+        const paymentData = insertPaymentSchema.parse({
+          userId: userId,
+          sessionId: sessionId,
+          amount: session.totalCost!,
         });
+        
+        const payment = await storage.createPayment(paymentData);
+        
+        // Check if Stripe is initialized
+        if (!stripe) {
+          // Mock API for development when Stripe API key is not set
+          console.log("[MOCK API] Creating fake payment intent for amount:", session.totalCost);
+          
+          return res.json({
+            paymentId: payment.id,
+            clientSecret: `mock_pi_secret_${payment.id}_${Date.now()}`,
+            note: "This is a mock client secret. Set STRIPE_SECRET_KEY to use real Stripe integration."
+          });
+        }
+        
+        // Create payment intent
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount: Math.round(session.totalCost! * 100), // Convert to cents
+          currency: "jpy",
+          customer: user.stripe_customer_id,
+        });
+        
+        res.json({
+          paymentId: payment.id,
+          clientSecret: paymentIntent.client_secret,
+        });
+      } catch (dbError: any) {
+        console.error('[Payment API] Database error:', dbError);
+        res.status(500).json({ message: `Database error: ${dbError.message}` });
       }
-      
-      // Create payment intent
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(session.totalCost! * 100), // Convert to cents
-        currency: "jpy",
-        customer: user.stripeCustomerId,
-      });
-      
-      res.json({
-        paymentId: payment.id,
-        clientSecret: paymentIntent.client_secret,
-      });
     } catch (err: any) {
       res.status(400).json({ message: err.message });
     }

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useCallback, useState } from 'react';
 import { Button } from './ui/button';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import { useQRScanner } from '../lib/qrScanner';
@@ -13,27 +13,31 @@ interface QRScannerProps {
 }
 
 export function QRScanner({ onScan, onScanError, onStartScan, onStopScan, scanning }: QRScannerProps) {
-  const { scannedData, error, flashlightOn, toggleFlashlight } = useQRScanner();
-
-  // Khi có kết quả quét, gọi callback để xử lý
-  React.useEffect(() => {
-    if (scannedData) {
-      onScan(scannedData);
+  const { error, flashlightOn, toggleFlashlight } = useQRScanner();
+  const [isProcessing, setIsProcessing] = useState(false);
+  
+  // Handle scan result
+  const handleScan = useCallback((detectedCodes: IDetectedBarcode[]) => {
+    console.log("🚀 ~ handleScan ~ detectedCodes:", detectedCodes);
+    
+    // Only process if we're scanning and not already processing a code
+    if (!scanning || isProcessing || !detectedCodes.length || !detectedCodes[0].rawValue) {
+      return;
     }
-  }, [scannedData, onScan]);
-
-  // Xử lý lỗi nếu có
-  React.useEffect(() => {
-    if (error && onScanError) {
-      onScanError(error);
-    }
-  }, [error, onScanError]);
-
-  const handleScan = (detectedCodes: IDetectedBarcode[]) => {
-    if (detectedCodes.length > 0 && detectedCodes[0].rawValue) {
-      onScan(detectedCodes[0].rawValue);
-    }
-  };
+    
+    // Set processing flag to prevent multiple scans
+    setIsProcessing(true);
+    
+    // Process the QR code
+    const qrData = detectedCodes[0].rawValue;
+    console.log("Processing QR code:", qrData);
+    onScan(qrData);
+    
+    // Reset processing flag after a delay
+    setTimeout(() => {
+      setIsProcessing(false);
+    }, 2000); // 2 second cooldown
+  }, [scanning, isProcessing, onScan]);
 
   const handleError = (error: unknown) => {
     if (onScanError) {
@@ -80,7 +84,7 @@ export function QRScanner({ onScan, onScanError, onStartScan, onStopScan, scanni
         {/* Scanning indicator */}
         {scanning && (
           <div className="absolute z-10 bottom-0 left-0 right-0 bg-[#06C755] text-white px-4 py-2 text-center">
-            Scanning...
+            {isProcessing ? "Processing..." : "Scanning..."}
           </div>
         )}
       </div>
@@ -115,5 +119,4 @@ export function QRScanner({ onScan, onScanError, onStartScan, onStopScan, scanni
   );
 }
 
-// Cung cấp export mặc định cho tương thích ngược với code hiện tại
 export default QRScanner;

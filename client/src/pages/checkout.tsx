@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
-import { getStripe, createPaymentIntent, confirmPayment } from "@/lib/stripe";
+import { getStripe, createPaymentIntent, confirmPayment, setupCustomerPaymentMethod } from "@/lib/stripe";
 import { Card, CardContent } from "@/components/ui/card";
 import { LineButton } from "@/components/ui/line-button";
 import { useSession } from "@/contexts/SessionContext";
@@ -27,6 +27,13 @@ function CheckoutForm({ sessionId, totalAmount }: { sessionId: number, totalAmou
   useEffect(() => {
     const getPaymentIntent = async () => {
       try {
+        // Đảm bảo đã setup payment method trước
+        console.log("Setting up payment method...");
+        await setupCustomerPaymentMethod();
+        console.log("Payment method set up successfully");
+        
+        // Sau đó mới tạo payment intent
+        console.log("Creating payment intent...");
         const { clientSecret, paymentId } = await createPaymentIntent(sessionId);
         setClientSecret(clientSecret);
         setPaymentId(paymentId);
@@ -114,6 +121,7 @@ function CheckoutForm({ sessionId, totalAmount }: { sessionId: number, totalAmou
         className="py-3"
         disabled={!stripe || !elements || isProcessing || !clientSecret}
       >
+       
         {isProcessing
           ? "Processing..."
           : `Confirm & Pay ¥${totalAmount}`

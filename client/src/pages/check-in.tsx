@@ -31,103 +31,45 @@ export default function CheckInPage({ liff }: { liff: any }) {
     }
   }, [liff]);
 
+  // Add this near the top of your component
+  const [isProcessingCheckIn, setIsProcessingCheckIn] = useState(false);
+
+  // Then modify your QR scan handler function
   const handleScan = async (data: string) => {
-    if (isProcessing) return;
-    
-    try {
-      setIsProcessing(true);
-      
-      // Verify LINE connection first if it's required
-      // if (!isLineConnected) {
-      //   console.log("LINE connection required:", isLineConnected);
-      //   toast({
-      //     title: "LINE connection required",
-      //     description: "Please make sure you're logged in with your LINE account before checking in.",
-      //     variant: "destructive",
-      //   });
-        
-      //   // Set timeout để đảm bảo toast hiển thị trước khi dừng quét
-      //   setTimeout(() => {
-      //     setIsProcessing(false);
-      //     setScanning(false);
-      //   }, 1000);
-        
-      //   return;
-      // }
-      
-      // Validate QR code - Đảm bảo mã QR có dữ liệu
-      if (!data) {
-        throw new Error("Invalid QR code. Please scan a valid check-in QR code.");
-      }
-      
-      console.log("QR code scanned:", data);
-      
-      // Phân tích mã QR để lấy thông tin bàn (tableId)
-      // Format mẫu: "CAFE-TABLE-{tableId}" hoặc có thể có định dạng JSON
-      let tableId = 1; // Mặc định là bàn 1
-      
-      try {
-        if (data.startsWith("CAFE-TABLE-")) {
-          const parts = data.split("-");
-          if (parts.length >= 3) {
-            tableId = parseInt(parts[2]);
-          }
-        } else if (data.includes("tableId")) {
-          // Thử parse dữ liệu dưới dạng JSON
-          const jsonData = JSON.parse(data);
-          if (jsonData.tableId) {
-            tableId = parseInt(jsonData.tableId);
-          }
-        }
-      } catch (e) {
-        console.error("Failed to parse QR data:", e);
-        // Tiếp tục với tableId mặc định
-      }
-      
-      // Gọi API để check-in với tableId xác định
-      const response = await apiRequest('POST', '/api/sessions/check-in', {
-        tableId: tableId
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to check in");
-      }
-      
-      // Nếu check-in thành công, gọi hàm checkIn từ SessionContext để cập nhật trạng thái
-      await checkIn();
-      
+    console.log("QR code scanned:", data);
+    if(!isLINELoggedIn(liff)){
       toast({
-        title: "Checked in successfully",
-        description: "Your session has started. Enjoy your time at Time Cafe!",
+        title: "LINE Account Required",
+        description: "Please return to login and connect your LINE account first.",
       });
-      
-      // Đảm bảo toast hiển thị trước khi chuyển trang
-      setTimeout(() => {
-        navigate("/active-session");
-      }, 1000);
-    } catch (error) {
-      console.error("Failed to check in:", error);
-      toast({
-        title: "Check-in failed",
-        description: error instanceof Error ? error.message : "Failed to start your session",
-        variant: "destructive",
-      });
-      
-      // Đảm bảo toast hiển thị và giữ scan active
-      setTimeout(() => {
-        setIsProcessing(false);
-        // Không dừng scanning để người dùng có thể thử lại
-      }, 1000);
-      
-      return; // Thoát sớm để không chạy phần finally
+      return;
+    }
+    // Prevent duplicate API calls
+    if (isProcessingCheckIn) {
+      console.log("Already processing check-in, ignoring duplicate scan");
+      return;
     }
     
-    // Chỉ chạy phần này khi thành công (không có lỗi)
-    setTimeout(() => {
-      setIsProcessing(false);
-      setScanning(false);
-    }, 1000);
+    setIsProcessingCheckIn(true);
+    
+    try {
+      // Your existing check-in logic here
+      await checkIn();
+      toast({
+        title: "Check-in successful",
+        description: "You have been checked in successfully",
+      });
+      navigate("/");
+      // Other success handling
+    } catch (error) {
+      // Error handling
+      console.error("Check-in failed:", error);
+    } finally {
+      // Reset after a delay to prevent rapid consecutive scans
+      setTimeout(() => {
+        setIsProcessingCheckIn(false);
+      }, 2000);
+    }
   };
 
   return (

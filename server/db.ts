@@ -229,6 +229,22 @@ const createSqliteTables = (sqlite) => {
     
     console.log(`✅ Seeded ${menuItems.length} menu items`);
   }
+
+  // Check if we have any users, if not create a test user
+  const userCount = sqlite.prepare("SELECT COUNT(*) as count FROM users").get();
+  
+  if (userCount.count === 0) {
+    console.log("🌱 Creating test user...");
+    
+    const insertStmt = sqlite.prepare(`
+      INSERT INTO users (username, password, full_name, email)
+      VALUES (?, ?, ?, ?)
+    `);
+    
+    insertStmt.run('test', 'password', 'Test User', 'test@example.com');
+    
+    console.log(`✅ Created test user with username: test, password: password`);
+  }
 };
 
 // Create SQLite client

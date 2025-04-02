@@ -5,7 +5,8 @@ export const AUTH_TOKEN_KEY = 'auth_token';
 
 // API base URL có thể được thay đổi khi cần kết nối từ GitHub Pages đến Railway
 // Địa chỉ API server trên Railway
-export const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://miniappline-production.up.railway.app';
+//export const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://miniappline-production.up.railway.app';
+export const API_BASE_URL = 'http://localhost:5000';
 console.log("🚀 ~ import.meta.env.VITE_API_URL :", import.meta.env.VITE_API_URL )
 console.log("🚀 ~ API_BASE_URL:", API_BASE_URL)
 
@@ -35,36 +36,38 @@ export async function apiRequest(
   method: string,
   url: string,
   data?: unknown | undefined,
+  options?: RequestInit
 ): Promise<Response> {
   // Nếu URL không có protocol (http:// hoặc https://), thêm API_BASE_URL
   const fullUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
   
   // Chuẩn bị request options
-  const options: RequestInit = {
+  const requestOptions: RequestInit = {
     method,
     headers: {},
+    ...options
   };
   
   // Thêm token vào header nếu đã đăng nhập
   const token = getAuthToken();
   if (token) {
-    options.headers = { 
-      ...options.headers,
+    requestOptions.headers = { 
+      ...requestOptions.headers,
       'Authorization': `Bearer ${token}`
     };
   }
   
   // Chỉ thêm headers và body nếu method không phải GET hoặc HEAD và có data
   if (method !== 'GET' && method !== 'HEAD' && data !== undefined) {
-    options.headers = { 
-      ...options.headers,
+    requestOptions.headers = { 
+      ...requestOptions.headers,
       "Content-Type": "application/json",
     };
-    options.body = JSON.stringify(data);
+    requestOptions.body = JSON.stringify(data);
   }
   
   console.log(`Gọi API: ${method} ${fullUrl}`);
-  const res = await fetch(fullUrl, options);
+  const res = await fetch(fullUrl, requestOptions);
   console.log(`Kết quả API: ${res.status}`);
 
   await throwIfResNotOk(res);
