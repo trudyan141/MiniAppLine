@@ -496,19 +496,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "User already has an active session" });
       }
       
-      // Convert Date to ISO string since the schema expects a string
+      // Tạo chuỗi ISO theo cách thủ công để tránh lỗi toISOString
       const now = new Date();
+      console.log("Current date object type:", typeof now);
+      console.log("Current date object constructor:", now.constructor.name);
       console.log("Current date object:", now);
+      console.log("Current date toString:", now.toString());
+      console.log("Current date valueOf:", now.valueOf());
       
+      // Format date manually using constructor
       let checkInTimeStr;
       try {
-        checkInTimeStr = now.toISOString();
-        console.log("ISO string:", checkInTimeStr);
+        // Sử dụng phương thức getUTC để đảm bảo kết quả nhất quán
+        checkInTimeStr = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-${String(now.getUTCDate()).padStart(2, '0')}T${String(now.getUTCHours()).padStart(2, '0')}:${String(now.getUTCMinutes()).padStart(2, '0')}:${String(now.getUTCSeconds()).padStart(2, '0')}.${String(now.getUTCMilliseconds()).padStart(3, '0')}Z`;
+        console.log("Manually created ISO string:", checkInTimeStr);
       } catch (error) {
-        console.error("Error converting date to ISO string:", error);
-        // Fallback to manual ISO string format
-        checkInTimeStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}T${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}.${String(now.getMilliseconds()).padStart(3, '0')}Z`;
-        console.log("Fallback ISO string:", checkInTimeStr);
+        console.error("Error creating manual ISO string:", error);
+        // Fallback to old format as last resort
+        checkInTimeStr = new Date().toLocaleString();
+        console.log("Using locale string fallback:", checkInTimeStr);
       }
       
       const sessionData = insertSessionSchema.parse({
@@ -546,21 +552,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Session is not active" });
       }
       
-      // Convert dates to ISO string safely
+      // Tạo chuỗi ISO theo cách thủ công để tránh lỗi toISOString
       const now = new Date();
+      console.log("Checkout - Current date object type:", typeof now);
+      console.log("Checkout - Current date object:", now);
+      
+      // Format date manually
       let checkOutTimeStr;
       try {
-        checkOutTimeStr = now.toISOString();
+        // Sử dụng phương thức getUTC để đảm bảo kết quả nhất quán
+        checkOutTimeStr = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-${String(now.getUTCDate()).padStart(2, '0')}T${String(now.getUTCHours()).padStart(2, '0')}:${String(now.getUTCMinutes()).padStart(2, '0')}:${String(now.getUTCSeconds()).padStart(2, '0')}.${String(now.getUTCMilliseconds()).padStart(3, '0')}Z`;
+        console.log("Manually created ISO string for checkout:", checkOutTimeStr);
       } catch (error) {
-        console.error("Error converting checkout date to ISO string:", error);
-        // Fallback to manual ISO string format
-        checkOutTimeStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}T${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}.${String(now.getMilliseconds()).padStart(3, '0')}Z`;
+        console.error("Error creating manual ISO string for checkout:", error);
+        // Fallback to old format as last resort
+        checkOutTimeStr = new Date().toLocaleString();
+        console.log("Using locale string fallback for checkout:", checkOutTimeStr);
       }
       
-      // Make sure checkInTime is a valid date
+      // Parse checkInTime safely
       let checkInTime;
       try {
+        // Nếu checkInTime không phải là Date thì tạo một đối tượng Date mới
         checkInTime = new Date(session.checkInTime);
+        console.log("Parsed checkInTime:", checkInTime);
+        
         if (isNaN(checkInTime.getTime())) {
           throw new Error("Invalid date");
         }
@@ -575,7 +591,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // First hour: 500 yen
       // Additional time: 8 yen per minute
       // Max daily charge: 2000 yen
-      let totalCost = 500; // First hour
+      let totalCost = 500;
       
       if (totalTimeSeconds > 3600) {
         const additionalMinutes = Math.ceil((totalTimeSeconds - 3600) / 60);
