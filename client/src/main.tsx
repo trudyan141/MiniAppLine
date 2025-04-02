@@ -4,7 +4,7 @@ import "./index.css";
 import { initializeLINE } from "./lib/line";
 
 // Get base path from Vite config
-const BASE_PATH = import.meta.env.BASE_URL || "/MiniAppLine/";
+const BASE_PATH = import.meta.env.BASE_URL ? import.meta.env.BASE_URL.replace(/\/$/, '') : "/MiniAppLine";
 // console.log("Base path:", BASE_PATH);
 
 // Initialize LINE LIFF SDK

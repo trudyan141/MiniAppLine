@@ -241,28 +241,28 @@ export class MemStorage implements IStorage {
         category: "Drinks",
         description: "Rich espresso with steamed milk",
         price: 420,
-        imageUrl: "https://images.unsplash.com/photo-1517701604599-bb29b565090c",
+        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/5/51/%28A_Donde_Vamos%2C_Quito%29_Chocolate_of_Ecuador_and_Espresso.JPG",
       },
       {
         name: "Green Tea",
         category: "Drinks",
         description: "Traditional Japanese green tea",
         price: 320,
-        imageUrl: "https://images.unsplash.com/photo-1544787219-7f47ccb76574",
+        imageUrl: "https://i.ebayimg.com/images/g/AP8AAOSw6Btj9UCV/s-l1600.webp",
       },
       {
         name: "Avocado Sandwich",
         category: "Light Meals",
         description: "Avocado, tomato, and cheese on toast",
         price: 580,
-        imageUrl: "https://images.unsplash.com/photo-1565958011703-44f9829ba187",
+        imageUrl: "https://www.clubhouse.ca/-/media/project/oneweb/mccormick-us/frenchs/recipes/h/1376x774/ham_and_cheese_sandwich_with_creamy_yellow_mustard_1376x774.jpg?rev=609ac9507b2641d4bbffd8a53c8bd132&vd=20220426T153226Z&extension=webp&hash=CA4DA2460ED9D2F6183F2483EF4AE1CC",
       },
       {
         name: "Caesar Salad",
         category: "Light Meals",
         description: "Fresh romaine with parmesan and croutons",
         price: 650,
-        imageUrl: "https://images.unsplash.com/photo-1623855244183-52fd8d3ce2f7",
+        imageUrl: "https://www.fifteenspatulas.com/wp-content/uploads/2011/10/Caesar-Salad-Fifteen-Spatulas-1-640x959.jpg",
       },
     ];
 
@@ -650,6 +650,7 @@ async function seedMenuItems() {
     
     try {
       existingItems = await db.select().from(menuItemsTable);
+      console.log("🚀 ~ seedMenuItems ~ existingItems:", existingItems)
       console.log(`Found ${existingItems?.length || 0} existing menu items`);
     } catch (error) {
       console.error(`Error checking existing menu items: ${error}`);

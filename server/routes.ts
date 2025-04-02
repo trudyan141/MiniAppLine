@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
 import { z } from "zod";
-import { insertUserSchema, insertSessionSchema, insertOrderSchema, insertOrderItemSchema, insertPaymentSchema } from "@shared/schema";
+import { insertUserSchema, insertSessionSchema, insertOrderSchema, insertOrderItemSchema, insertPaymentSchema, MenuItem } from "@shared/schema";
 import session from "express-session";
 import Stripe from "stripe";
 import MemoryStore from "memorystore";
@@ -650,7 +650,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/menu", async (req, res) => {
     try {
       const menuItems = await storage.getMenuItems();
-      res.json(menuItems);
+      console.log("🚀 ~ app.get ~ menuItems:", menuItems);
+      
+      // Đảm bảo URL của ảnh được trả về đúng như trong database
+      const processedMenuItems = menuItems.map((item: MenuItem) => {
+        // Nếu imageUrl bắt đầu bằng "/images/" thì đây là relative URL
+        // Cần chuyển đổi thành URL tuyệt đối để khớp với dữ liệu trong DB
+        if (item.imageUrl && item.imageUrl.startsWith('/images/')) {
+          console.log("⚠️ Chuyển đổi relative URL thành absolute URL:", item.imageUrl);
+          item.imageUrl = `https://miniappline-production.up.railway.app${item.imageUrl}`;
+        }
+        
+        return item;
+      });
+      
+      res.json(processedMenuItems);
     } catch (err: any) {
       res.status(400).json({ message: err.message });
     }
@@ -1018,6 +1032,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ createdCoupons });
     } catch (err: any) {
       res.status(400).json({ message: err.message });
+    }
+  });
+
+  // Reset menu items route (for development only)
+  app.post('/api/admin/reset-menu', async (req, res) => {
+    try {
+      // Only allow this in development mode
+      if (process.env.NODE_ENV === 'production') {
+        return res.status(403).json({ success: false, message: "Not allowed in production" });
+      }
+
+      // Get SQLite client
+      const sqlite = (db as any).$client;
+      
+      // Delete existing menu items
+      sqlite.prepare('DELETE FROM menu_items').run();
+
+      // Create new menu items
+      const menuItems = [
+        { name: 'Espresso', category: 'Coffee', description: 'Strong Italian coffee', price: 300, image_url: 'https://upload.wikimedia.org/wikipedia/commons/5/51/%28A_Donde_Vamos%2C_Quito%29_Chocolate_of_Ecuador_and_Espresso.JPG', available: 1 },
+        { name: 'Latte', category: 'Coffee', description: 'Espresso with steamed milk', price: 350, image_url: 'https://driftaway.coffee/wp-content/uploads/2015/09/shutterstock_117176206.jpg', available: 1 },
+        { name: 'Chocolate Cake', category: 'Dessert', description: 'Rich chocolate cake', price: 400, image_url: 'https://i.ebayimg.com/images/g/LtgAAOSwKKxlEsrW/s-l1600.webp', available: 1 },
+        { name: 'Green Tea', category: 'Tea', description: 'Japanese green tea', price: 250, image_url: 'https://i.ebayimg.com/images/g/AP8AAOSw6Btj9UCV/s-l1600.webp', available: 1 },
+        { name: 'Sandwich', category: 'Food', description: 'Ham and cheese sandwich', price: 500, image_url: 'https://www.clubhouse.ca/-/media/project/oneweb/mccormick-us/frenchs/recipes/h/1376x774/ham_and_cheese_sandwich_with_creamy_yellow_mustard_1376x774.jpg?rev=609ac9507b2641d4bbffd8a53c8bd132&vd=20220426T153226Z&extension=webp&hash=CA4DA2460ED9D2F6183F2483EF4AE1CC', available: 1 },
+      ];
+
+      // Prepare insert statement
+      const insertStmt = sqlite.prepare(`
+        INSERT INTO menu_items (name, category, description, price, image_url, available)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `);
+      
+      // Insert each menu item
+      menuItems.forEach(item => {
+        insertStmt.run(
+          item.name, 
+          item.category, 
+          item.description, 
+          item.price, 
+          item.image_url, 
+          item.available
+        );
+      });
+
+      // Force a restart of the server to refresh the menu items
+      return res.json({ 
+        success: true, 
+        message: `Reset ${menuItems.length} menu items successfully. Please restart the server to see the updated menu items.` 
+      });
+    } catch (error: any) {
+      console.error("Error resetting menu items:", error);
+      return res.status(500).json({ 
+        success: false, 
+        message: "Failed to reset menu items",
+        error: error.message
+      });
     }
   });
 
