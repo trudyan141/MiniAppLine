@@ -6,7 +6,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Cài đặt các phụ thuộc
-RUN npm install --production
+RUN npm install
 
 # Sao chép tất cả các file dự án 
 COPY . .
