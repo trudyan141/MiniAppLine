@@ -34,7 +34,39 @@ export default function MainLayout({ children, showNavigation = true }: MainLayo
                 <span className="text-xs mt-1">Home</span>
               </div>
             </Link>
-
+            
+            {activeSession ? (
+              <Link href="/active-session">
+                <div className={`flex flex-col items-center px-3 py-1 ${location === "/active-session" ? "text-[#06C755]" : "text-gray-500"}`}>
+                  <svg 
+                    xmlns="http://www.w3.org/2000/svg" 
+                    className="h-6 w-6" 
+                    fill="none" 
+                    viewBox="0 0 24 24" 
+                    stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="text-xs mt-1">Session</span>
+                </div>
+              </Link>
+            ) : (
+              <Link href="/check-in">
+                <div className={`flex flex-col items-center px-3 py-1 ${location === "/check-in" ? "text-[#06C755]" : "text-gray-500"}`}>
+                  <svg 
+                    xmlns="http://www.w3.org/2000/svg" 
+                    className="h-6 w-6" 
+                    fill="none" 
+                    viewBox="0 0 24 24" 
+                    stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <span className="text-xs mt-1">Check In</span>
+                </div>
+              </Link>
+            )}
+            
             <Link href="/menu">
               <div className={`flex flex-col items-center px-3 py-1 ${location === "/menu" ? "text-[#06C755]" : "text-gray-500"}`}>
                 <svg 
@@ -49,22 +81,7 @@ export default function MainLayout({ children, showNavigation = true }: MainLayo
                 <span className="text-xs mt-1">Menu</span>
               </div>
             </Link>
-
-            <Link href="/activity">
-              <div className={`flex flex-col items-center px-3 py-1 ${location === "/activity" ? "text-[#06C755]" : "text-gray-500"}`}>
-                <svg 
-                  xmlns="http://www.w3.org/2000/svg" 
-                  className="h-6 w-6" 
-                  fill="none" 
-                  viewBox="0 0 24 24" 
-                  stroke="currentColor"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span className="text-xs mt-1">Activity</span>
-              </div>
-            </Link>
-
+            
             <Link href="/profile">
               <div className={`flex flex-col items-center px-3 py-1 ${location === "/profile" ? "text-[#06C755]" : "text-gray-500"}`}>
                 <svg 
