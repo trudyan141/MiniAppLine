@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express, { type Request, Response, NextFunction } from "express";
 import cors from "cors";
 import { createServer, Server } from "http";
@@ -8,6 +9,10 @@ import { seedMenuItems } from "./seed";
 import Vite from "vite";
 import { testSQLiteDateHandling } from "./debug";
 import { setupVite, serveStatic, log } from "./vite";
+
+console.log('Đang load biến môi trường từ .env file...');
+console.log('STRIPE_SECRET_KEY:', process.env.STRIPE_SECRET_KEY);
+console.log('NODE_ENV:', process.env.NODE_ENV);
 
 const app = express();
 app.use(express.json());

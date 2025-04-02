@@ -43,17 +43,16 @@ const wrapWithDevelopmentFallback = (fn) => {
 
 // Áp dụng wrapper cho tất cả các hàm trong storage
 const wrapStorageMethods = (storageObj) => {
+  console.log("Wrapping storage methods...");
+  
+  // Trong môi trường dev không có DB, sử dụng mock
   if (isDevelopmentWithoutDB) {
-    const wrappedStorage = {};
-    for (const key in storageObj) {
-      if (typeof storageObj[key] === 'function') {
-        wrappedStorage[key] = wrapWithDevelopmentFallback(storageObj[key]);
-      } else {
-        wrappedStorage[key] = storageObj[key];
-      }
-    }
-    return wrappedStorage;
+    console.log("Using mock storage in development mode...");
+    const memStorage = new MemStorage();
+    return memStorage;
   }
+  
+  // Nếu không, trả về đối tượng ban đầu
   return storageObj;
 };
 
@@ -695,28 +694,24 @@ async function seedMenuItems() {
           },
         ];
         
-        // Use direct SQL insertion instead of ORM
-        const sqlite = (dbClient as any).session.dialect.database as Database;
-        
-        const insertStmt = sqlite.prepare(`
-          INSERT INTO menu_items (name, category, description, price, image_url, available)
-          VALUES (?, ?, ?, ?, ?, ?)
-        `);
-        
-        for (const item of initialMenuItems) {
-          insertStmt.run([
-            item.name,
-            item.category,
-            item.description,
-            item.price,
-            item.imageUrl,
-            item.available ? 1 : 0
-          ]);
+        // Thử sử dụng ORM trước
+        try {
+          for (const item of initialMenuItems) {
+            await db.insert(menuItemsTable).values({
+              name: item.name,
+              category: item.category,
+              description: item.description,
+              price: item.price,
+              imageUrl: item.imageUrl,
+              available: item.available
+            });
+          }
+          console.log(`✅ Seeded ${initialMenuItems.length} menu items successfully`);
+        } catch (error) {
+          console.error(`Error seeding menu items with ORM: ${error}`);
         }
-        
-        console.log(`✅ Seeded ${initialMenuItems.length} menu items successfully`);
       } catch (error) {
-        console.error(`Error seeding menu items with direct SQL: ${error}`);
+        console.error(`Error preparing seed data: ${error}`);
       }
     }
   } catch (error) {

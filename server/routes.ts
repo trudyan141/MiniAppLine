@@ -38,10 +38,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }));
 
   // Setup Stripe
-  const stripeSecretKey = process.env.STRIPE_SECRET_KEY || "sk_test_your_test_key";
-  const stripe = new Stripe(stripeSecretKey, {
-    apiVersion: "2025-03-31.basil",
-  });
+  const stripeSecretKey = process.env.STRIPE_SECRET_KEY || "sk_test_51PTK07Cu9AgLpE3WqAxlBYnCDwIIT7ptcbMfZzqqlhrmvMC4l9QF4v385GoaMNNSkop5v86K1fSV5XEBsxR5zBTT00lGeY13KG";
+  console.log("🚀 ~ registerRoutes ~ process.env.STRIPE_SECRET_KEY:", process.env.STRIPE_SECRET_KEY)
+  let stripe: Stripe | null = null;
+  
+  try {
+    // Try to initialize Stripe with the key
+    stripe = new Stripe(stripeSecretKey, {
+      apiVersion: '2023-10-16' as any, // Cast to any để tránh lỗi type
+    });
+    console.log("Stripe initialized successfully with key:", stripeSecretKey.substring(0, 8) + "...");
+  } catch (error) {
+    console.warn("Failed to initialize Stripe:", error);
+    // We'll use mock API if initialization fails
+  }
 
   // Auth routes
   app.post("/api/auth/register", async (req, res) => {
@@ -54,19 +64,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Username and password are required' });
       }
 
-      // Check if username already exists
-      const existingUser = await storage.getUserByUsername(username);
-      if (existingUser) {
-        return res.status(400).json({ message: 'Username already exists' });
-      }
-
-      // Dùng mật khẩu được hash sẵn (trong thực tế cần bcrypt)
-      const hashedPassword = `hashed_${password}`;
-      
-      // Try to create user with direct SQL instead of ORM
+      // Check if username exists by direct query
       try {
         const sqlite = (db as any).$client;
         
+        // Check existing user
+        const checkUserStmt = sqlite.prepare('SELECT * FROM users WHERE username = ?');
+        const existingUser = checkUserStmt.get(username);
+        
+        if (existingUser) {
+          return res.status(400).json({ message: 'Username already exists' });
+        }
+        
+        // Dùng mật khẩu được hash sẵn (trong thực tế cần bcrypt)
+        const hashedPassword = `hashed_${password}`;
+        
+        // Create user with direct SQL
         const stmt = sqlite.prepare(`
           INSERT INTO users (
             username, password, full_name, email, 
@@ -132,31 +145,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { username, password } = req.body;
       
-      const user = await storage.getUserByUsername(username);
-      if (!user) {
-        return res.status(401).json({ message: "Invalid credentials" });
-      }
+      console.log("Login request:", { username });
+      
+      // Get user with direct SQL
+      try {
+        const sqlite = (db as any).$client;
+        
+        // Get user
+        const getUserStmt = sqlite.prepare('SELECT * FROM users WHERE username = ?');
+        const user = getUserStmt.get(username);
+        
+        if (!user) {
+          return res.status(401).json({ message: "Invalid credentials" });
+        }
 
-      // Hash password the same way as registration
-      const hashedPassword = `hashed_${password}`;
-      if (user.password !== hashedPassword) {
-        return res.status(401).json({ message: "Invalid credentials" });
-      }
-      
-      // Set session
-      req.session.userId = user.id;
-      
-      // Save session explicitly
-      req.session.save((err) => {
-        if (err) {
-          console.error('Error saving session:', err);
-          return res.status(500).json({ message: "Failed to save session" });
+        // Hash password the same way as registration
+        const hashedPassword = `hashed_${password}`;
+        if (user.password !== hashedPassword) {
+          return res.status(401).json({ message: "Invalid credentials" });
         }
         
-        // Return user without password
-        const { password: pwd, ...userWithoutPassword } = user;
-        res.json(userWithoutPassword);
-      });
+        // Set session
+        req.session.userId = user.id;
+        
+        // Save session explicitly
+        req.session.save((err) => {
+          if (err) {
+            console.error('Error saving session:', err);
+            return res.status(500).json({ message: "Failed to save session" });
+          }
+          
+          // Return user without password
+          const userData = {
+            id: user.id,
+            username: user.username,
+            fullName: user.full_name,
+            email: user.email,
+            phoneNumber: user.phone_number,
+            dateOfBirth: user.date_of_birth,
+            registeredAt: user.registered_at
+          };
+          
+          res.json(userData);
+        });
+      } catch (dbError: any) {
+        console.error('Database error during login:', dbError);
+        res.status(500).json({ message: `Database error: ${dbError.message}` });
+      }
     } catch (err: any) {
       res.status(400).json({ message: err.message });
     }
@@ -285,43 +320,93 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // DEV MODE: Auto-login with first user
         if (process.env.NODE_ENV !== 'production') {
           console.log("[DEV MODE] Auto-login with first user");
-          const firstUser = await storage.getUsers(1);
-          if (firstUser && firstUser.length > 0) {
-            req.session.userId = firstUser[0].id;
-            await new Promise<void>((resolve) => {
-              req.session.save(() => resolve());
-            });
-            return res.json({ 
-              message: "Auto-login successful", 
-              userId: firstUser[0].id,
-              user: firstUser[0]
-            });
+          
+          try {
+            const sqlite = (db as any).$client;
+            
+            // Get first user
+            const getUserStmt = sqlite.prepare('SELECT * FROM users LIMIT 1');
+            const firstUser = getUserStmt.get();
+            
+            if (firstUser) {
+              req.session.userId = firstUser.id;
+              await new Promise<void>((resolve) => {
+                req.session.save(() => resolve());
+              });
+              
+              const userData = {
+                id: firstUser.id,
+                username: firstUser.username,
+                fullName: firstUser.full_name,
+                email: firstUser.email
+              };
+              
+              return res.json({ 
+                message: "Auto-login successful", 
+                userId: firstUser.id,
+                user: userData
+              });
+            }
+          } catch (error) {
+            console.error('[DEV MODE] Error auto-login:', error);
           }
         }
         
         return res.status(401).json({ message: "Not authenticated" });
       }
       
-      const user = await storage.getUser(userId);
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
+      // Direct database queries
+      try {
+        const sqlite = (db as any).$client;
+        
+        // Get user
+        const getUserStmt = sqlite.prepare('SELECT * FROM users WHERE id = ?');
+        const user = getUserStmt.get(userId);
+        
+        if (!user) {
+          return res.status(404).json({ message: "User not found" });
+        }
+        
+        // If user already has a Stripe customer ID, return it
+        if (user.stripe_customer_id) {
+          return res.json({ customerId: user.stripe_customer_id });
+        }
+        
+        // Check if Stripe is initialized
+        if (!stripe) {
+          // Mock API for development when Stripe API key is not set
+          console.log("[MOCK API] Creating fake Stripe customer for user:", userId);
+          const mockCustomerId = `mock_customer_${userId}_${Date.now()}`;
+          
+          // Update user with mock Stripe customer ID
+          const updateStmt = sqlite.prepare(`
+            UPDATE users SET stripe_customer_id = ? WHERE id = ?
+          `);
+          updateStmt.run(mockCustomerId, userId);
+          
+          return res.json({ 
+            customerId: mockCustomerId,
+            note: "This is a mock customer ID. Set STRIPE_SECRET_KEY to use real Stripe integration."
+          });
+        }
+        
+        // Create Stripe customer
+        const customer = await stripe.customers.create({
+          email: user.email,
+          name: user.full_name,
+        });
+        
+        // Update user with Stripe customer ID
+        const updateStmt = sqlite.prepare(`
+          UPDATE users SET stripe_customer_id = ? WHERE id = ?
+        `);
+        updateStmt.run(customer.id, userId);
+        
+        res.json({ customerId: customer.id });
+      } catch (dbError: any) {
+        console.error('[Stripe API] Database error:', dbError);
+        res.status(500).json({ message: `Database error: ${dbError.message}` });
       }
-      
-      // If user already has a Stripe customer ID, return it
-      if (user.stripeCustomerId) {
-        return res.json({ customerId: user.stripeCustomerId });
-      }
-      
-      // Create Stripe customer
-      const customer = await stripe.customers.create({
-        email: user.email,
-        name: user.fullName,
-      });
-      
-      // Update user with Stripe customer ID
-      await storage.updateStripeCustomerId(userId, customer.id);
-      
-      res.json({ customerId: customer.id });
     } catch (err: any) {
       console.error("[Stripe API] Error:", err);
       res.status(400).json({ message: err.message });
@@ -342,6 +427,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!user.stripeCustomerId) {
         return res.status(400).json({ message: "Stripe customer not set up" });
+      }
+      
+      // Check if Stripe is initialized
+      if (!stripe) {
+        // Mock API for development when Stripe API key is not set
+        console.log("[MOCK API] Creating fake setup intent for customer:", user.stripeCustomerId);
+        
+        return res.json({ 
+          clientSecret: `mock_seti_secret_${userId}_${Date.now()}`,
+          note: "This is a mock client secret. Set STRIPE_SECRET_KEY to use real Stripe integration."
+        });
       }
       
       const setupIntent = await stripe.setupIntents.create({
@@ -672,14 +768,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "User does not have a payment method set up" });
       }
       
-      // Create payment intent
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(session.totalCost! * 100), // Convert to cents
-        currency: "jpy",
-        customer: user.stripeCustomerId,
-      });
-      
-      // Record payment in our system
+      // Create payment in our database first
       const paymentData = insertPaymentSchema.parse({
         userId,
         sessionId,
@@ -687,6 +776,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       const payment = await storage.createPayment(paymentData);
+      
+      // Check if Stripe is initialized
+      if (!stripe) {
+        // Mock API for development when Stripe API key is not set
+        console.log("[MOCK API] Creating fake payment intent for amount:", session.totalCost);
+        
+        return res.json({
+          paymentId: payment.id,
+          clientSecret: `mock_pi_secret_${payment.id}_${Date.now()}`,
+          note: "This is a mock client secret. Set STRIPE_SECRET_KEY to use real Stripe integration."
+        });
+      }
+      
+      // Create payment intent
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(session.totalCost! * 100), // Convert to cents
+        currency: "jpy",
+        customer: user.stripeCustomerId,
+      });
       
       res.json({
         paymentId: payment.id,

@@ -1,7 +1,12 @@
+import 'dotenv/config';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import express from 'express';
 import chalk from 'chalk';
 import http from 'http';
+import cors from 'cors';
+
+console.log('Đang load biến môi trường trong proxy...');
+console.log('STRIPE_SECRET_KEY:', process.env.STRIPE_SECRET_KEY);
 
 const API_SERVER_PORT = 5000;
 const CLIENT_SERVER_PORT = 3000;
