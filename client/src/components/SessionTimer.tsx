@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useTimer } from "@/lib/useTimer";
 import { Card } from "./ui/card";
 import { Session } from "@shared/schema";
@@ -11,25 +11,74 @@ interface SessionTimerProps {
 
 export default function SessionTimer({ session, onTimeUpdate }: SessionTimerProps) {
   const { totalOrderAmount } = useSession();
-  const startTime = new Date(session.checkInTime);
-  const initialSeconds = Math.floor((Date.now() - startTime.getTime()) / 1000);
+  const [initialSeconds, setInitialSeconds] = useState<number>(0);
+  
+  useEffect(() => {
+    // Xử lý an toàn chuỗi thời gian
+    try {
+      // Lấy chuỗi thời gian từ session
+      const checkInTimeStr = session.checkInTime;
+      console.log("Raw checkInTime:", checkInTimeStr);
+      
+      // Tạo đối tượng Date từ chuỗi thời gian
+      let startTime: Date;
+      
+      if (typeof checkInTimeStr === 'string') {
+        // Nếu là chuỗi ISO, sử dụng trực tiếp
+        startTime = new Date(checkInTimeStr);
+        console.log("Parsed date:", startTime);
+        
+        // Kiểm tra xem date có hợp lệ không
+        if (isNaN(startTime.getTime())) {
+          console.error("Invalid date from checkInTime:", checkInTimeStr);
+          // Sử dụng thời gian hiện tại làm fallback
+          startTime = new Date();
+        }
+      } else {
+        // Nếu không phải chuỗi, sử dụng thời gian hiện tại
+        console.error("checkInTime is not a string:", checkInTimeStr);
+        startTime = new Date();
+      }
+      
+      // Tính thời gian đã trôi qua tính bằng giây
+      const seconds = Math.floor((Date.now() - startTime.getTime()) / 1000);
+      console.log("Calculated seconds:", seconds);
+      
+      // Đảm bảo số giây là số dương
+      const validSeconds = seconds > 0 ? seconds : 0;
+      setInitialSeconds(validSeconds);
+    } catch (error) {
+      console.error("Error parsing session time:", error);
+      // Trong trường hợp lỗi, sử dụng 0 làm giá trị mặc định
+      setInitialSeconds(0);
+    }
+  }, [session.checkInTime]);
   
   const timer = useTimer({
     initialSeconds,
     autoStart: true,
   });
-
+  
   useEffect(() => {
     if (onTimeUpdate) {
       onTimeUpdate(timer.raw.totalSeconds, timer.calculateCost());
     }
   }, [timer.raw.totalSeconds, timer.calculateCost, onTimeUpdate]);
-
-  const formattedStartTime = startTime.toLocaleTimeString('en-US', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
+  
+  // Format thời gian bắt đầu phiên
+  let formattedStartTime = "00:00";
+  try {
+    const startTime = new Date(session.checkInTime);
+    if (!isNaN(startTime.getTime())) {
+      formattedStartTime = startTime.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      });
+    }
+  } catch (error) {
+    console.error("Error formatting start time:", error);
+  }
 
   return (
     <Card className="bg-white p-4 rounded-xl shadow-md">

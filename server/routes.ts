@@ -1069,7 +1069,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create new menu items
       const menuItems = [
         { name: 'Espresso', category: 'Coffee', description: 'Strong Italian coffee', price: 300, image_url: 'https://upload.wikimedia.org/wikipedia/commons/5/51/%28A_Donde_Vamos%2C_Quito%29_Chocolate_of_Ecuador_and_Espresso.JPG', available: 1 },
-        { name: 'Latte', category: 'Coffee', description: 'Espresso with steamed milk', price: 350, image_url: 'https://driftaway.coffee/wp-content/uploads/2015/09/shutterstock_117176206.jpg', available: 1 },
+        { name: 'Latte', category: 'Coffee', description: 'Espresso with steamed milk', price: 350, image_url: 'https://nhanvipcoffee.com.vn/wp-content/uploads/2024/06/Partners-Latte-FT-BLOG0523-09569880de524fe487831d95184495cc-1024x683.jpeg.webp', available: 1 },
         { name: 'Chocolate Cake', category: 'Dessert', description: 'Rich chocolate cake', price: 400, image_url: 'https://i.ebayimg.com/images/g/LtgAAOSwKKxlEsrW/s-l1600.webp', available: 1 },
         { name: 'Green Tea', category: 'Tea', description: 'Japanese green tea', price: 250, image_url: 'https://i.ebayimg.com/images/g/AP8AAOSw6Btj9UCV/s-l1600.webp', available: 1 },
         { name: 'Sandwich', category: 'Food', description: 'Ham and cheese sandwich', price: 500, image_url: 'https://www.clubhouse.ca/-/media/project/oneweb/mccormick-us/frenchs/recipes/h/1376x774/ham_and_cheese_sandwich_with_creamy_yellow_mustard_1376x774.jpg?rev=609ac9507b2641d4bbffd8a53c8bd132&vd=20220426T153226Z&extension=webp&hash=CA4DA2460ED9D2F6183F2483EF4AE1CC', available: 1 },

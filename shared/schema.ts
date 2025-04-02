@@ -24,7 +24,7 @@ export const users = pgTable("users", {
   phoneNumber: text("phone_number"),
   dateOfBirth: text("date_of_birth"),
   stripeCustomerId: text("stripe_customer_id"),
-  registeredAt: timestamp("registered_at").defaultNow().notNull(),
+  registeredAt: timestamp("registered_at").$defaultFn(() => new Date()).notNull(),
   // LINE specific fields
   lineUserId: text("line_user_id").unique(),
   lineDisplayName: text("line_display_name"),
@@ -124,7 +124,7 @@ export const orders = pgTable("orders", {
   id: serial("id").primaryKey(),
   sessionId: integer("session_id").notNull().references(() => sessions.id),
   userId: integer("user_id").notNull().references(() => users.id),
-  orderTime: timestamp("order_time").defaultNow().notNull(),
+  orderTime: timestamp("order_time").$defaultFn(() => new Date()).notNull(),
   status: text("status").notNull().default("pending"), // pending, completed, canceled
   totalCost: real("total_cost").notNull(),
 });
@@ -133,7 +133,7 @@ export const ordersTable = sqliteTable("orders", {
   id: sqliteInt("id").primaryKey({ autoIncrement: true }),
   sessionId: sqliteInt("session_id").notNull().references(() => sessionsTable.id),
   userId: sqliteInt("user_id").notNull().references(() => usersTable.id),
-  orderTime: sqliteText("order_time").notNull(),
+  orderTime: sqliteText("order_time").notNull().$defaultFn(() => safeISOString(new Date())),
   status: sqliteText("status").notNull().default("pending"), // pending, completed, canceled
   totalCost: sqliteReal("total_cost").notNull(),
 });
@@ -178,7 +178,7 @@ export const payments = pgTable("payments", {
   stripePaymentId: text("stripe_payment_id"),
   status: text("status").notNull().default("pending"), // pending, completed, failed
   paymentMethod: text("payment_method").default("card"),
-  paymentTime: timestamp("payment_time").defaultNow().notNull(),
+  paymentTime: timestamp("payment_time").$defaultFn(() => new Date()).notNull(),
 });
 
 export const paymentsTable = sqliteTable("payments", {
@@ -189,7 +189,7 @@ export const paymentsTable = sqliteTable("payments", {
   stripePaymentId: sqliteText("stripe_payment_id"),
   status: sqliteText("status").notNull().default("pending"), // pending, completed, failed
   paymentMethod: sqliteText("payment_method").default("card"),
-  paymentTime: sqliteText("payment_time").notNull(),
+  paymentTime: sqliteText("payment_time").notNull().$defaultFn(() => safeISOString(new Date())),
 });
 
 export const insertPaymentSchema = createInsertSchema(payments).pick({
@@ -208,7 +208,7 @@ export const coupons = pgTable("coupons", {
   value: real("value").notNull(),
   expiryDate: timestamp("expiry_date").notNull(),
   isUsed: boolean("is_used").notNull().default(false),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").$defaultFn(() => new Date()).notNull(),
 });
 
 export const couponsTable = sqliteTable("coupons", {
@@ -219,7 +219,7 @@ export const couponsTable = sqliteTable("coupons", {
   value: sqliteReal("value").notNull(),
   expiryDate: sqliteText("expiry_date").notNull(),
   isUsed: sqliteInt("is_used", { mode: "boolean" }).notNull().default(false),
-  createdAt: sqliteText("created_at").notNull(),
+  createdAt: sqliteText("created_at").notNull().$defaultFn(() => safeISOString(new Date())),
 });
 
 export const insertCouponSchema = createInsertSchema(coupons).pick({
