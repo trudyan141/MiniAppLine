@@ -25,8 +25,7 @@ export default function MenuCard({
 
   // Xử lý hình ảnh
   const getImageUrl = () => {
-   
-    console.log("🚀 ~ getImageUrl ~ item:", item)
+  
     if (item.imageUrl === 'https://vi.wikipedia.org/wiki/T%E1%BA%ADp_tin:(A_Donde_Vamos,_Quito)_Chocolate_of_Ecuador_and_Espresso.JPG') {
       return 'https://upload.wikimedia.org/wikipedia/commons/5/51/%28A_Donde_Vamos%2C_Quito%29_Chocolate_of_Ecuador_and_Espresso.JPG'
     }
